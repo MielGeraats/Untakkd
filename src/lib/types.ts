@@ -16,7 +16,7 @@ export type Strain = {
   created_at: string
 }
 
-export type Method = 'joint' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'other'
+export type Method = 'joint' | 'voorie' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'other'
 
 export type CheckinPerson = {
   id: number
@@ -36,12 +36,15 @@ export type Checkin = {
   smoked_at: string | null
   notes: string | null
   photo_path: string | null
+  session_of: number | null
   created_at: string
   profile: Profile
   strain: Strain
   people: CheckinPerson[]
   likes: { user_id: string }[]
   comments: { count: number }[]
+  /** other people who checked in to the same session (filled by withSessions) */
+  session_mates?: Profile[]
 }
 
 export type Comment = {

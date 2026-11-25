@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { CheckinCard } from '../components/CheckinCard'
 import { Empty, Spinner } from '../components/Spinner'
 import { useMe } from '../lib/auth'
-import { CHECKIN_SELECT, normalizeCheckin } from '../lib/queries'
+import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import { supabase } from '../lib/supabase'
 import type { Checkin } from '../lib/types'
 
@@ -21,7 +21,7 @@ export function Feed() {
     const { data, error } = await supabase.from('checkins').select(CHECKIN_SELECT)
       .order('created_at', { ascending: false }).range(offset, offset + PAGE - 1)
     if (error) setError(error.message)
-    const rows = (data ?? []).map(normalizeCheckin)
+    const rows = await withSessions((data ?? []).map(normalizeCheckin))
     setItems((prev) => (offset === 0 ? rows : [...prev, ...rows]))
     setMore(rows.length === PAGE)
     setLoading(false)

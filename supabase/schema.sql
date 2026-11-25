@@ -41,7 +41,7 @@ create table public.checkins (
   user_id    uuid not null default auth.uid() references public.profiles on delete cascade,
   strain_id  bigint not null references public.strains on delete restrict,
   method     text not null default 'joint'
-             check (method in ('joint', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other')),
+             check (method in ('joint', 'voorie', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other')),
   rating     numeric(2,1) not null check (rating between 0.5 and 5 and rating * 2 = floor(rating * 2)),
   bought_at  text check (char_length(bought_at) <= 80),
   smoked_at  text check (char_length(smoked_at) <= 80),
@@ -245,3 +245,72 @@ returns setof public.profiles language sql stable security definer set search_pa
 $$;
 revoke execute on function public.friends_of(uuid) from public, anon;
 grant  execute on function public.friends_of(uuid) to authenticated;
+
+-- How many times someone rolled, without double counting a joint that several people checked in.
+-- Roller tags for the same strain less than 3 hours apart count as one session. Within a session,
+-- each check-in by the same person is a separate joint, so the session counts as the most
+-- check-ins any one person posted in it.
+create or replace function public.rolled_count(uid uuid)
+returns integer language sql stable security definer set search_path = public as $$
+  with tags as (
+    select c.user_id as poster, c.strain_id, c.created_at
+    from checkin_people cp
+    join checkins c on c.id = cp.checkin_id
+    where cp.user_id = uid and cp.role = 'roller'
+  ),
+  marked as (
+    select *, case when created_at - lag(created_at) over (partition by strain_id order by created_at)
+                        <= interval '3 hours' then 0 else 1 end as new_session
+    from tags
+  ),
+  sessions as (
+    select *, sum(new_session) over (partition by strain_id order by created_at rows unbounded preceding) as session
+    from marked
+  ),
+  per_poster as (
+    select strain_id, session, poster, count(*) as n from sessions group by strain_id, session, poster
+  ),
+  per_session as (
+    select strain_id, session, max(n) as n from per_poster group by strain_id, session
+  )
+  select coalesce(sum(n), 0)::integer from per_session;
+$$;
+revoke execute on function public.rolled_count(uuid) from public, anon;
+grant  execute on function public.rolled_count(uuid) to authenticated;
+
+-- Sessions: a check-in can join a friend's check-in. session_of points to the first check-in
+-- of the session (no foreign key, so a session stays together if that first one is deleted).
+alter table public.checkins add column if not exists session_of bigint;
+create index if not exists checkins_session_idx on public.checkins (session_of);
+
+-- you can only join a session you can actually see
+drop policy if exists "checkins create" on public.checkins;
+create policy "checkins create" on public.checkins for insert to authenticated
+  with check (user_id = auth.uid() and (session_of is null or public.can_see_checkin(session_of)));
+
+-- Public stats: any logged-in user can see anyone's stats and badges.
+-- The check-ins themselves stay friends-only; this only returns what the stats need.
+create or replace function public.profile_stats_data(uid uuid)
+returns json language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(json_build_object(
+    'id', c.id, 'user_id', c.user_id, 'strain_id', c.strain_id, 'method', c.method, 'rating', c.rating,
+    'bought_at', c.bought_at, 'smoked_at', c.smoked_at, 'created_at', c.created_at,
+    'strain', json_build_object('id', s.id, 'name', s.name, 'type', s.type),
+    'people', coalesce((
+      select json_agg(json_build_object(
+        'id', cp.id, 'role', cp.role, 'user_id', cp.user_id, 'name', cp.name,
+        'profile', case when p.id is null then null else json_build_object(
+          'id', p.id, 'username', p.username, 'display_name', p.display_name, 'avatar_url', p.avatar_url) end))
+      from checkin_people cp left join profiles p on p.id = cp.user_id
+      where cp.checkin_id = c.id), '[]'::json)
+  ) order by c.created_at desc), '[]'::json)
+  from checkins c join strains s on s.id = c.strain_id
+  where c.user_id = uid;
+$$;
+revoke execute on function public.profile_stats_data(uuid) from public, anon;
+grant  execute on function public.profile_stats_data(uuid) to authenticated;
+
+-- Voorie (pre-roll) as a method; already part of the create table above on fresh setups.
+alter table public.checkins drop constraint if exists checkins_method_check;
+alter table public.checkins add constraint checkins_method_check
+  check (method in ('joint', 'voorie', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other'));

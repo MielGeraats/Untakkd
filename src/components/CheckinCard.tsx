@@ -58,6 +58,14 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
   if (c.bought_at) details.push(['🛒', 'Gescoord bij', c.bought_at])
   if (rollers.length) details.push(['🌀', 'Gedraaid door', <PeopleList people={rollers} />])
   if (buddies.length) details.push(['👥', 'Met', <PeopleList people={buddies} />])
+  if (c.session_mates?.length) {
+    details.push(['🤝', 'Samen met', c.session_mates.map((p, i) => (
+      <span key={p.id}>
+        {i > 0 && (i === c.session_mates!.length - 1 ? ' & ' : ', ')}
+        <Link to={`/u/${p.username}`} className="font-bold text-leaf-700 hover:underline">{p.display_name || p.username}</Link>
+      </span>
+    ))])
+  }
 
   return (
     <article className="card overflow-hidden">

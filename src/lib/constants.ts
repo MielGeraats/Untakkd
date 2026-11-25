@@ -2,6 +2,7 @@ import type { Method, StrainType } from './types'
 
 export const METHODS: { id: Method; label: string; emoji: string }[] = [
   { id: 'joint', label: 'Joint', emoji: '🚬' },
+  { id: 'voorie', label: 'Voorie', emoji: '🎁' },
   { id: 'blunt', label: 'Blunt', emoji: '🌯' },
   { id: 'spliff', label: 'Spliff', emoji: '🍃' },
   { id: 'bong', label: 'Bong', emoji: '🫧' },

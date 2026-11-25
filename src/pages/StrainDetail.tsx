@@ -4,7 +4,7 @@ import { CheckinCard } from '../components/CheckinCard'
 import { Empty, Spinner } from '../components/Spinner'
 import { Stars } from '../components/Stars'
 import { StrainTypePill } from '../components/StrainTypePill'
-import { CHECKIN_SELECT, normalizeCheckin } from '../lib/queries'
+import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import { supabase } from '../lib/supabase'
 import type { Checkin, Strain } from '../lib/types'
 
@@ -21,7 +21,7 @@ export function StrainDetail() {
       setStats({ count: Number(s?.checkin_count ?? 0), avg: Number(s?.avg_rating ?? 0) })
     })
     supabase.from('checkins').select(CHECKIN_SELECT).eq('strain_id', id).order('created_at', { ascending: false }).limit(50)
-      .then(({ data }) => setCheckins((data ?? []).map(normalizeCheckin)))
+      .then(async ({ data }) => setCheckins(await withSessions((data ?? []).map(normalizeCheckin))))
   }, [id])
 
   if (strain === undefined) return <Spinner />

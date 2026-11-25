@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Avatar } from '../components/Avatar'
 import { CameraIcon, XIcon } from '../components/Icons'
 import { PeoplePicker, type PersonPick } from '../components/PeoplePicker'
 import { StarInput } from '../components/Stars'
@@ -9,10 +10,11 @@ import { useMe } from '../lib/auth'
 import { METHODS } from '../lib/constants'
 import { splitFriendships, useFriendships } from '../lib/friends'
 import { resizeImage } from '../lib/image'
-import { CHECKIN_SELECT, normalizeCheckin, personKey } from '../lib/queries'
+import { CHECKIN_SELECT, normalizeCheckin, personKey, sessionKey } from '../lib/queries'
 import { computeBadges, computeStats } from '../lib/stats'
 import { photoUrl, supabase } from '../lib/supabase'
-import type { CheckinPerson, Method, Profile, Strain } from '../lib/types'
+import { timeAgo } from '../lib/time'
+import type { Checkin, CheckinPerson, Method, Profile, Strain } from '../lib/types'
 
 const uniq = (xs: (string | null)[]) => {
   const seen = new Map<string, string>()
@@ -28,10 +30,11 @@ export function NewCheckin() {
   const me = useMe()
   const navigate = useNavigate()
   const editId = Number(useParams().id) || null
-  const { rows } = useFriendships()
+  const { rows, loading: friendsLoading } = useFriendships()
   const friends = useMemo(() => splitFriendships(rows, me.id).friends, [rows, me.id])
 
-  const initialStrain = (useLocation().state as { strain?: Strain } | null)?.strain ?? null
+  const navState = useLocation().state as { strain?: Strain; join?: Checkin } | null
+  const initialStrain = navState?.strain ?? null
   const [strain, setStrain] = useState<Strain | null>(initialStrain)
   const [method, setMethod] = useState<Method>('joint')
   const [rating, setRating] = useState(0)
@@ -44,6 +47,8 @@ export function NewCheckin() {
   const [keptPhoto, setKeptPhoto] = useState<string | null>(null) // existing photo when editing
   const [original, setOriginal] = useState<{ people: CheckinPerson[]; photo: string | null } | null>(null)
   const [loadingEdit, setLoadingEdit] = useState(Boolean(editId))
+  const [join, setJoin] = useState<Checkin | null>(null)
+  const [recent, setRecent] = useState<Checkin[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [past, setPast] = useState<{ shops: string[]; spots: string[] }>({ shops: [], spots: [] })
@@ -75,11 +80,54 @@ export function NewCheckin() {
     })
   }, [editId, me.id, navigate])
 
+  // Friends' check-ins from the last 3 hours, one per session, to join.
+  useEffect(() => {
+    if (editId) return
+    const since = new Date(Date.now() - 3 * 3600_000).toISOString()
+    supabase.from('checkins').select(CHECKIN_SELECT).neq('user_id', me.id).gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(20)
+      .then(({ data }) => {
+        const seen = new Set<number>()
+        setRecent((data ?? []).map(normalizeCheckin).filter((c) => !seen.has(sessionKey(c)) && seen.add(sessionKey(c))).slice(0, 4))
+      })
+  }, [editId, me.id])
+
+  // Joining copies the session's details. People you're not friends with become plain names,
+  // because you can only tag your own friends.
+  const joinSession = useCallback((c: Checkin) => {
+    const friendIds = new Set(friends.map((f) => f.id))
+    const asPick = (uid: string | null, profile: Profile | null, name: string | null): PersonPick | null => {
+      if (uid === me.id) return { user: me }
+      if (uid && profile && friendIds.has(uid)) return { user: profile }
+      const label = profile ? profile.display_name || profile.username : name
+      return label ? { name: label.slice(0, 40) } : null
+    }
+    const picks = (xs: (PersonPick | null)[]) => xs.filter((x): x is PersonPick => x !== null)
+    setJoin(c)
+    setStrain(c.strain)
+    setMethod(c.method)
+    setSmokedAt(c.smoked_at ?? '')
+    setBoughtAt(c.bought_at ?? '')
+    setRoller(picks(c.people.filter((p) => p.role === 'roller').map((p) => asPick(p.user_id, p.profile, p.name))))
+    setBuddies(picks([
+      asPick(c.user_id, c.profile, null),
+      ...c.people.filter((p) => p.role === 'buddy' && p.user_id !== me.id).map((p) => asPick(p.user_id, p.profile, p.name)),
+    ]))
+    setError('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [friends, me])
+
+  // Came here via "Ik zat erbij" on someone's check-in.
+  useEffect(() => {
+    if (navState?.join && !friendsLoading && !join) joinSession(navState.join)
+  }, [navState, friendsLoading, join, joinSession])
+
   const newPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo])
   useEffect(() => () => { if (newPreview) URL.revokeObjectURL(newPreview) }, [newPreview])
   const preview = newPreview ?? (keptPhoto ? photoUrl(keptPhoto) : null)
 
-  const rolls = method !== 'edible' && method !== 'vape'
+  // Nobody rolled a voorie (pre-roll), a vape or an edible.
+  const rolls = method !== 'edible' && method !== 'vape' && method !== 'voorie'
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -123,10 +171,13 @@ export function NewCheckin() {
         return navigate(`/checkin/${editId}`, { replace: true })
       }
 
+      const rolledBefore = (await supabase.rpc('rolled_count', { uid: me.id })).data ?? 0
+
       const { data: created, error } = await supabase.from('checkins').insert({
         strain_id: strain.id, method, rating,
         bought_at: boughtAt.trim() || null, smoked_at: smokedAt.trim() || null,
         notes: notes.trim() || null, photo_path,
+        session_of: join ? sessionKey(join) : null,
       }).select('id').single()
       if (error) throw error
 
@@ -139,14 +190,13 @@ export function NewCheckin() {
       }
 
       // Work out which badges this check-in unlocked.
-      const [{ data: mine }, { count }] = await Promise.all([
+      const [{ data: mine }, { data: rolledAfter }] = await Promise.all([
         supabase.from('checkins').select(CHECKIN_SELECT).eq('user_id', me.id),
-        supabase.from('checkin_people').select('id', { count: 'exact', head: true }).eq('user_id', me.id).eq('role', 'roller'),
+        supabase.rpc('rolled_count', { uid: me.id }),
       ])
       const all = (mine ?? []).map(normalizeCheckin)
-      const selfRolled = rolls && roller.some((p) => p.user?.id === me.id) ? 1 : 0
-      const before = computeBadges(computeStats(all.filter((c) => c.id !== created.id), (count ?? 0) - selfRolled))
-      const after = computeBadges(computeStats(all, count ?? 0))
+      const before = computeBadges(computeStats(all.filter((c) => c.id !== created.id), rolledBefore))
+      const after = computeBadges(computeStats(all, rolledAfter ?? 0))
       const unlocked = after.filter((b) => b.earned && !before.find((x) => x.id === b.id)?.earned)
 
       navigate(`/checkin/${created.id}`, { replace: true, state: { unlocked } })
@@ -161,6 +211,32 @@ export function NewCheckin() {
   return (
     <form onSubmit={submit} className="space-y-6">
       <h1 className="page-title">{editId ? 'Check-in bewerken' : 'Nieuwe check-in'}</h1>
+
+      {join ? (
+        <section className="card flex items-center gap-3 border-leaf-300 bg-leaf-50 p-4">
+          <span className="text-2xl">🤝</span>
+          <p className="flex-1 text-sm">
+            Zelfde rotation als <b>{join.profile.display_name || join.profile.username}</b>. Alles staat al klaar, geef alleen nog je eigen cijfer.
+          </p>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setJoin(null)}>Toch niet</button>
+        </section>
+      ) : !editId && recent.length > 0 && (
+        <section>
+          <label className="label">🤝 Zat je bij een maat?</label>
+          <div className="space-y-2">
+            {recent.map((c) => (
+              <div key={c.id} className="card flex items-center gap-3 p-3">
+                <Avatar profile={c.profile} size="sm" />
+                <p className="min-w-0 flex-1 text-sm leading-snug">
+                  <b>{c.profile.display_name || c.profile.username}</b> · {c.strain.name}
+                  <span className="block text-xs text-leaf-800/50">{timeAgo(c.created_at)}{c.smoked_at ? ` · ${c.smoked_at}` : ''}</span>
+                </p>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => joinSession(c)}>Zelfde rotation 🔄</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <label className="label">Wat rook je?</label>

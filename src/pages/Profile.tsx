@@ -8,7 +8,7 @@ import { Stars } from '../components/Stars'
 import { useMe } from '../lib/auth'
 import { methodInfo } from '../lib/constants'
 import { relationTo, splitFriendships, useFriendships } from '../lib/friends'
-import { CHECKIN_SELECT, normalizeCheckin } from '../lib/queries'
+import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import { computeBadges, computeStats } from '../lib/stats'
 import { supabase } from '../lib/supabase'
 import type { Checkin, Profile } from '../lib/types'
@@ -21,13 +21,15 @@ export function ProfilePage() {
   const me = useMe()
   const { rows, reload } = useFriendships()
   const [user, setUser] = useState<Profile | null | undefined>(undefined)
-  const [checkins, setCheckins] = useState<Checkin[] | null>(null)
+  const [checkins, setCheckins] = useState<Checkin[] | null>(null) // full check-ins, friends only
+  const [statsData, setStatsData] = useState<Checkin[] | null>(null) // public, just what the stats need
   const [rolled, setRolled] = useState(0)
   const [tab, setTab] = useState<Tab>('activity')
 
   useEffect(() => {
     setUser(undefined)
     setCheckins(null)
+    setStatsData(null)
     setTab('activity')
     supabase.from('profiles').select('*').eq('username', username ?? '').maybeSingle().then(({ data }) => setUser(data))
   }, [username])
@@ -35,27 +37,37 @@ export function ProfilePage() {
   const relation = user ? relationTo(rows, me.id, user.id) : { kind: 'none' as const }
   const canSee = relation.kind === 'self' || relation.kind === 'friends'
 
+  // Stats and badges are public.
   useEffect(() => {
     if (!user) return
     Promise.all([
-      supabase.from('checkins').select(CHECKIN_SELECT).eq('user_id', user.id).order('created_at', { ascending: false }).limit(500),
-      supabase.from('checkin_people').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('role', 'roller'),
+      supabase.rpc('profile_stats_data', { uid: user.id }),
+      supabase.rpc('rolled_count', { uid: user.id }),
     ]).then(([a, b]) => {
-      setCheckins((a.data ?? []).map(normalizeCheckin))
-      setRolled(b.count ?? 0)
+      setStatsData(((a.data ?? []) as unknown[]).map(normalizeCheckin))
+      setRolled(b.data ?? 0)
     })
+  }, [user])
+
+  // The check-ins themselves are for friends only.
+  useEffect(() => {
+    if (!user || !canSee) return
+    supabase.from('checkins').select(CHECKIN_SELECT).eq('user_id', user.id).order('created_at', { ascending: false }).limit(500)
+      .then(async ({ data }) => setCheckins(await withSessions((data ?? []).map(normalizeCheckin))))
   }, [user, canSee])
 
   const myFriends = useMemo(() => splitFriendships(rows, me.id).friends.length, [rows, me.id])
   const friendCount = user?.id === me.id ? myFriends : null
 
-  const stats = useMemo(() => (checkins ? computeStats(checkins, rolled) : null), [checkins, rolled])
+  const stats = useMemo(() => (statsData ? computeStats(statsData, rolled) : null), [statsData, rolled])
   const badges = useMemo(() => (stats ? computeBadges(stats) : []), [stats])
 
   if (user === undefined) return <Spinner />
   if (user === null) return <Empty emoji="🤷" title="Hier woont niemand">Er is geen gebruiker die @{username} heet.</Empty>
 
   const earned = badges.filter((b) => b.earned)
+  const tabs: Tab[] = canSee ? ['activity', 'stats', 'badges', 'friends'] : ['stats', 'badges']
+  const shownTab = tabs.includes(tab) ? tab : tabs[0]
 
   return (
     <div>
@@ -74,7 +86,7 @@ export function ProfilePage() {
         </div>
         {user.bio && <p className="mt-4 text-leaf-900/80">{user.bio}</p>}
 
-        {canSee && stats && (
+        {stats && (
           <div className="mt-5 grid grid-cols-4 gap-2 text-center">
             {[
               [stats.total, 'Check-ins'],
@@ -94,32 +106,34 @@ export function ProfilePage() {
         )}
       </section>
 
-      {!canSee ? (
-        <Empty emoji="🔒" title="Alleen voor maten">Word maten met {user.display_name || user.username} om check-ins, stats en badges te zien.</Empty>
-      ) : !checkins || !stats ? (
+      {!stats || (canSee && !checkins) ? (
         <Spinner />
       ) : (
         <>
           <div className="mb-4 flex rounded-full bg-leaf-100 p-1">
-            {(['activity', 'stats', 'badges', 'friends'] as Tab[]).map((t) => (
+            {tabs.map((t) => (
               <button key={t} onClick={() => setTab(t)}
-                className={`flex-1 rounded-full py-2 text-sm font-extrabold transition ${tab === t ? 'bg-white text-leaf-800 shadow-sm' : 'text-leaf-800/50'}`}>
+                className={`flex-1 rounded-full py-2 text-sm font-extrabold transition ${shownTab === t ? 'bg-white text-leaf-800 shadow-sm' : 'text-leaf-800/50'}`}>
                 {TAB_LABELS[t]}
               </button>
             ))}
           </div>
 
-          {tab === 'activity' && (
+          {!canSee && (
+            <p className="mb-4 text-center text-sm text-leaf-800/60">🔒 Check-ins en maten zie je pas als jullie maten zijn.</p>
+          )}
+
+          {shownTab === 'activity' && checkins && (
             checkins.length === 0
               ? <Empty emoji="🌱" title="Nog geen check-ins" />
               : <div className="space-y-4">{checkins.map((c) => <CheckinCard key={c.id} c={c} />)}</div>
           )}
 
-          {tab === 'stats' && <StatsView stats={stats} />}
+          {shownTab === 'stats' && <StatsView stats={stats} />}
 
-          {tab === 'friends' && <FriendsOf user={user} isMe={relation.kind === 'self'} />}
+          {shownTab === 'friends' && <FriendsOf user={user} isMe={relation.kind === 'self'} />}
 
-          {tab === 'badges' && (
+          {shownTab === 'badges' && (
             <div className="grid grid-cols-2 gap-3">
               {badges.map((b) => (
                 <div key={b.id} className={`card p-4 ${b.earned ? '' : 'opacity-55'}`}>

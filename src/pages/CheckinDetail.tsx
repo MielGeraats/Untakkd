@@ -5,7 +5,7 @@ import { CheckinCard } from '../components/CheckinCard'
 import { ChevronLeft } from '../components/Icons'
 import { Empty, Spinner } from '../components/Spinner'
 import { useMe } from '../lib/auth'
-import { CHECKIN_SELECT, normalizeCheckin } from '../lib/queries'
+import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import type { Badge } from '../lib/stats'
 import { supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/time'
@@ -29,7 +29,7 @@ export function CheckinDetail() {
 
   useEffect(() => {
     supabase.from('checkins').select(CHECKIN_SELECT).eq('id', Number(id)).maybeSingle()
-      .then(({ data }) => setCheckin(data ? normalizeCheckin(data) : null))
+      .then(async ({ data }) => setCheckin(data ? (await withSessions([normalizeCheckin(data)]))[0] : null))
     loadComments()
   }, [id, loadComments])
 
@@ -105,6 +105,10 @@ export function CheckinDetail() {
           <button className="btn btn-primary" disabled={busy || !body.trim()}>Plaats</button>
         </form>
       </section>
+
+      {checkin.user_id !== me.id && (
+        <Link to="/checkin/new" state={{ join: checkin }} className="btn btn-soft w-full">🔄 Zelfde rotation</Link>
+      )}
 
       {checkin.user_id === me.id && (
         <div className="flex gap-2">
