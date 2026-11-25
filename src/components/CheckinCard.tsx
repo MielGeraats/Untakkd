@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMe } from '../lib/auth'
 import { methodInfo } from '../lib/constants'
+import { placeUrl } from '../lib/places'
 import { personName } from '../lib/queries'
 import { photoUrl, supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/time'
@@ -57,8 +58,11 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
   }
 
   const details: [string, string, ReactNode][] = []
-  if (c.smoked_at) details.push(['📍', 'Gerookt bij', c.smoked_at])
-  if (c.bought_at) details.push(['🛒', 'Gescoord bij', c.bought_at])
+  const placeLink = (kind: 'spot' | 'shop', name: string) => (
+    <Link to={placeUrl(kind, name)} className="font-bold text-leaf-700 hover:underline">{name}</Link>
+  )
+  if (c.smoked_at) details.push(['📍', 'Gerookt bij', placeLink('spot', c.smoked_at)])
+  if (c.bought_at) details.push(['🛒', 'Gescoord bij', placeLink('shop', c.bought_at)])
   if (rollers.length) details.push(['🌀', 'Gedraaid door', <PeopleList people={rollers} />])
   if (buddies.length) details.push(['👥', 'Met', <PeopleList people={buddies} />])
   if (c.session_mates?.length) {

@@ -7,6 +7,7 @@ import { Empty, Spinner } from '../components/Spinner'
 import { Stars } from '../components/Stars'
 import { useMe } from '../lib/auth'
 import { methodInfo } from '../lib/constants'
+import { placeUrl } from '../lib/places'
 import { relationTo, splitFriendships, useFriendships } from '../lib/friends'
 import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import { computeBadges, computeStats } from '../lib/stats'
@@ -26,40 +27,58 @@ export function ProfilePage() {
   const [rolled, setRolled] = useState(0)
   const [tab, setTab] = useState<Tab>('activity')
 
+  const [statsError, setStatsError] = useState('')
+
   useEffect(() => {
+    let stale = false
     setUser(undefined)
     setCheckins(null)
     setStatsData(null)
+    setStatsError('')
     setTab('activity')
-    supabase.from('profiles').select('*').eq('username', username ?? '').maybeSingle().then(({ data }) => setUser(data))
+    supabase.from('profiles').select('*').eq('username', username ?? '').maybeSingle().then(({ data }) => { if (!stale) setUser(data) })
+    return () => { stale = true }
   }, [username])
 
   const relation = user ? relationTo(rows, me.id, user.id) : { kind: 'none' as const }
   const canSee = relation.kind === 'self' || relation.kind === 'friends'
 
   // Stats and badges are public.
+  // (`stale` drops answers that arrive after you've already switched to another profile.)
   useEffect(() => {
     if (!user) return
+    let stale = false
     Promise.all([
       supabase.rpc('profile_stats_data', { uid: user.id }),
       supabase.rpc('rolled_count', { uid: user.id }),
     ]).then(([a, b]) => {
+      if (stale) return
+      if (a.error) setStatsError(a.error.message)
       setStatsData(((a.data ?? []) as unknown[]).map(normalizeCheckin))
       setRolled(b.data ?? 0)
     })
+    return () => { stale = true }
   }, [user])
 
   // The check-ins themselves are for friends only.
   useEffect(() => {
     if (!user || !canSee) return
+    let stale = false
     supabase.from('checkins').select(CHECKIN_SELECT).eq('user_id', user.id).order('created_at', { ascending: false }).limit(500)
-      .then(async ({ data }) => setCheckins(await withSessions((data ?? []).map(normalizeCheckin))))
+      .then(async ({ data }) => {
+        const list = await withSessions((data ?? []).map(normalizeCheckin))
+        if (!stale) setCheckins(list)
+      })
+    return () => { stale = true }
   }, [user, canSee])
 
   const myFriends = useMemo(() => splitFriendships(rows, me.id).friends.length, [rows, me.id])
   const friendCount = user?.id === me.id ? myFriends : null
 
-  const stats = useMemo(() => (statsData ? computeStats(statsData, rolled) : null), [statsData, rolled])
+  // When you can see the full check-ins (your own profile or a friend's), count from those, so the
+  // stats always match the Activiteit tab. Everyone else gets the public stats.
+  const source = canSee && checkins ? checkins : statsData
+  const stats = useMemo(() => (source ? computeStats(source, rolled) : null), [source, rolled])
   const badges = useMemo(() => (stats ? computeBadges(stats) : []), [stats])
 
   if (user === undefined) return <Spinner />
@@ -122,6 +141,9 @@ export function ProfilePage() {
           {!canSee && (
             <p className="mb-4 text-center text-sm text-leaf-800/60">🔒 Check-ins en maten zie je pas als jullie maten zijn.</p>
           )}
+          {!canSee && statsError && (
+            <p className="mb-4 rounded-2xl bg-red-50 p-3 text-xs text-red-700">Stats laden lukt niet: {statsError}</p>
+          )}
 
           {shownTab === 'activity' && checkins && (
             checkins.length === 0
@@ -179,12 +201,14 @@ function StatsView({ stats }: { stats: ReturnType<typeof computeStats> }) {
 
       <div className="grid grid-cols-2 gap-3">
         {[
-          ['📍', 'Favoriete plek', top(stats.spots)],
-          ['🛒', 'Vaste shop', top(stats.shops)],
+          ['📍', 'Favoriete plek', stats.spots.length
+            ? <Link to={placeUrl('spot', stats.spots[0].label)} className="hover:underline">{top(stats.spots)}</Link> : '—'],
+          ['🛒', 'Vaste shop', stats.shops.length
+            ? <Link to={placeUrl('shop', stats.shops[0].label)} className="hover:underline">{top(stats.shops)}</Link> : '—'],
           ['🌀', 'Meestal gedraaid door', top(stats.rollers)],
           ['👥', 'Blowmaatje', top(stats.buddies)],
         ].map(([emoji, label, value]) => (
-          <div key={label} className="card p-4">
+          <div key={label as string} className="card p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-leaf-800/50">{emoji} {label}</p>
             <p className="mt-1 font-black leading-tight">{value}</p>
           </div>

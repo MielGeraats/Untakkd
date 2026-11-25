@@ -219,7 +219,9 @@ export function NewCheckin() {
 
       navigate(`/checkin/${created.id}`, { replace: true, state: { unlocked } })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Er ging iets mis. Neem een pof en probeer het opnieuw.')
+      // Supabase errors are plain objects with a message, not Error instances, so check for both.
+      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : ''
+      setError(msg ? `Er ging iets mis: ${msg}` : 'Er ging iets mis. Neem een pof en probeer het opnieuw.')
       setBusy(false)
     }
   }
