@@ -40,6 +40,9 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
   const rollers = c.people.filter((p) => p.role === 'roller')
   const buddies = c.people.filter((p) => p.role === 'buddy')
   const comments = commentCount ?? c.comments[0]?.count ?? 0
+  // Offer "Zelfde rotation" on friends' recent check-ins (last 6 hours) that you haven't joined yet.
+  const joined = c.user_id !== me.id && Boolean(c.session_mates?.some((p) => p.id === me.id))
+  const canJoin = linkToDetail && c.user_id !== me.id && !joined && Date.now() - new Date(c.created_at).getTime() < 6 * 3600_000
 
   async function toggleLike() {
     if (liked) {
@@ -83,6 +86,8 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-bold text-leaf-800/60">
               <span>{method.emoji} {method.label}</span>
               <StrainTypePill type={c.strain.type} />
+              <span aria-hidden>·</span>
+              <Link to={`/checkin/${c.id}`} className="hover:underline">{timeAgo(c.created_at)}</Link>
             </div>
           </div>
         </header>
@@ -124,9 +129,12 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
         ) : (
           <span className="btn btn-sm pointer-events-none text-leaf-700/70"><ChatIcon className="size-5" /> {comments}</span>
         )}
-        <Link to={`/checkin/${c.id}`} className="ml-auto pr-3 text-xs font-bold text-leaf-800/50 hover:underline">
-          {timeAgo(c.created_at)}
-        </Link>
+        {canJoin && (
+          <Link to="/checkin/new" state={{ join: c }} className="btn btn-sm ml-auto text-leaf-700 hover:bg-leaf-50">
+            🔄 Zelfde rotation
+          </Link>
+        )}
+        {joined && <span className="ml-auto pr-3 text-xs font-bold text-leaf-700/70">🔄 Jij zat erbij</span>}
       </footer>
     </article>
   )

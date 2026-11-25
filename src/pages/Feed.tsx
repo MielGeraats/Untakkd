@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckinCard } from '../components/CheckinCard'
+import { InstallHint } from '../components/InstallHint'
 import { Empty, Spinner } from '../components/Spinner'
 import { useMe } from '../lib/auth'
 import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
@@ -33,6 +34,7 @@ export function Feed() {
 
   return (
     <div>
+      <InstallHint />
       <div className="mb-4 flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight">Recente activiteit</h1>

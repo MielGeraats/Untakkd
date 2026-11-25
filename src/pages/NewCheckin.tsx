@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { CameraIcon, XIcon } from '../components/Icons'
 import { PeoplePicker, type PersonPick } from '../components/PeoplePicker'
+import { PlaceInput, type PlaceOption } from '../components/PlaceInput'
 import { StarInput } from '../components/Stars'
 import { Spinner } from '../components/Spinner'
 import { StrainPicker } from '../components/StrainPicker'
@@ -16,10 +17,21 @@ import { photoUrl, supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/time'
 import type { Checkin, CheckinPerson, Method, Profile, Strain } from '../lib/types'
 
-const uniq = (xs: (string | null)[]) => {
-  const seen = new Map<string, string>()
-  for (const x of xs) if (x?.trim() && !seen.has(x.trim().toLowerCase())) seen.set(x.trim().toLowerCase(), x.trim())
-  return [...seen.values()]
+/** Your own places first (most recent first), then your friends' places (most used first). */
+function placeOptions(rows: { user_id: string; place: string | null }[], me: string): PlaceOption[] {
+  const mine = new Map<string, string>()
+  const theirs = new Map<string, { label: string; n: number }>()
+  for (const r of rows) {
+    const label = r.place?.trim()
+    if (!label) continue
+    const k = label.toLowerCase()
+    if (r.user_id === me) { if (!mine.has(k)) mine.set(k, label) }
+    else theirs.set(k, { label: theirs.get(k)?.label ?? label, n: (theirs.get(k)?.n ?? 0) + 1 })
+  }
+  return [
+    ...[...mine.values()].map((label) => ({ label, mine: true })),
+    ...[...theirs.entries()].filter(([k]) => !mine.has(k)).sort((a, b) => b[1].n - a[1].n).map(([, v]) => ({ label: v.label, mine: false })),
+  ]
 }
 
 const pickKey = (p: PersonPick) => (p.user ? `u:${p.user.id}` : `n:${(p.name ?? '').trim().toLowerCase()}`)
@@ -51,13 +63,19 @@ export function NewCheckin() {
   const [recent, setRecent] = useState<Checkin[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [past, setPast] = useState<{ shops: string[]; spots: string[] }>({ shops: [], spots: [] })
+  const [past, setPast] = useState<{ shops: PlaceOption[]; spots: PlaceOption[] }>({ shops: [], spots: [] })
 
-  // Suggest places you've used before.
+  // Suggest places you used before, plus places your friends use (row-level security limits this to check-ins you can see).
   useEffect(() => {
-    supabase.from('checkins').select('bought_at, smoked_at').eq('user_id', me.id)
-      .order('created_at', { ascending: false }).limit(300)
-      .then(({ data }) => setPast({ shops: uniq((data ?? []).map((d) => d.bought_at)), spots: uniq((data ?? []).map((d) => d.smoked_at)) }))
+    supabase.from('checkins').select('user_id, bought_at, smoked_at')
+      .order('created_at', { ascending: false }).limit(500)
+      .then(({ data }) => {
+        const rows = data ?? []
+        setPast({
+          shops: placeOptions(rows.map((d) => ({ user_id: d.user_id, place: d.bought_at })), me.id),
+          spots: placeOptions(rows.map((d) => ({ user_id: d.user_id, place: d.smoked_at })), me.id),
+        })
+      })
   }, [me.id])
 
   // Editing: load the check-in and fill in the form.
@@ -263,15 +281,13 @@ export function NewCheckin() {
       <section className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="smoked">📍 Waar zit je?</label>
-          <input id="smoked" className="input" list="spots" maxLength={80} placeholder="Vondelpark, het balkon, de kroeg…"
-            value={smokedAt} onChange={(e) => setSmokedAt(e.target.value)} />
-          <datalist id="spots">{past.spots.map((s) => <option key={s} value={s} />)}</datalist>
+          <PlaceInput id="smoked" placeholder="Vondelpark, het balkon, de kroeg…"
+            value={smokedAt} onChange={setSmokedAt} options={past.spots} />
         </div>
         <div>
           <label className="label" htmlFor="bought">🛒 Waar heb je het gescoord?</label>
-          <input id="bought" className="input" list="shops" maxLength={80} placeholder="Coffeeshop, een maat…"
-            value={boughtAt} onChange={(e) => setBoughtAt(e.target.value)} />
-          <datalist id="shops">{past.shops.map((s) => <option key={s} value={s} />)}</datalist>
+          <PlaceInput id="bought" placeholder="Coffeeshop, een maat…"
+            value={boughtAt} onChange={setBoughtAt} options={past.shops} />
         </div>
       </section>
 

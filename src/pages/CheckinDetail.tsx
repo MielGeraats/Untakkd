@@ -106,7 +106,7 @@ export function CheckinDetail() {
         </form>
       </section>
 
-      {checkin.user_id !== me.id && (
+      {checkin.user_id !== me.id && !checkin.session_mates?.some((p) => p.id === me.id) && (
         <Link to="/checkin/new" state={{ join: checkin }} className="btn btn-soft w-full">🔄 Zelfde rotation</Link>
       )}
 
