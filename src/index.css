@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", ui-rounded, ui-sans-serif, system-ui, sans-serif;
+  --color-leaf-50: #f4faef;
+  --color-leaf-100: #e9f5e1;
+  --color-leaf-200: #d4ebc4;
+  --color-leaf-300: #b5dc9c;
+  --color-leaf-400: #8fc770;
+  --color-leaf-500: #6cb04c;
+  --color-leaf-600: #4f9a4a;
+  --color-leaf-700: #3f7a3b;
+  --color-leaf-800: #335f31;
+  --color-leaf-900: #24421f;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  @apply min-h-dvh bg-leaf-50 text-leaf-900 antialiased;
+  background-image: radial-gradient(circle at 20% -10%, var(--color-leaf-100), transparent 55%),
+    radial-gradient(circle at 110% 30%, #eef8e6, transparent 45%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl border border-leaf-100 bg-white/90 shadow-[0_4px_18px_-8px_rgba(63,122,59,0.25)];
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-extrabold transition active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-leaf-600 text-white shadow-sm hover:bg-leaf-700;
+  }
+  .btn-soft {
+    @apply bg-leaf-100 text-leaf-800 hover:bg-leaf-200;
+  }
+  .btn-ghost {
+    @apply text-leaf-700 hover:bg-leaf-100;
+  }
+  .btn-danger {
+    @apply bg-red-50 text-red-700 hover:bg-red-100;
+  }
+  .btn-sm {
+    @apply px-3.5 py-1.5 text-sm;
+  }
+  .input {
+    @apply w-full rounded-2xl border border-leaf-200 bg-white px-4 py-3 text-base outline-none transition placeholder:text-leaf-800/35 focus:border-leaf-500 focus:ring-4 focus:ring-leaf-200/70;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-extrabold text-leaf-800;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-bold transition;
+  }
+  .chip-off {
+    @apply border-leaf-200 bg-white text-leaf-800 hover:bg-leaf-50;
+  }
+  .chip-on {
+    @apply border-leaf-600 bg-leaf-600 text-white;
+  }
+  .page-title {
+    @apply mb-4 text-2xl font-black tracking-tight text-leaf-900;
+  }
+}
