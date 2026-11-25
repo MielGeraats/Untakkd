@@ -107,7 +107,10 @@ export function CheckinDetail() {
       </section>
 
       {checkin.user_id === me.id && (
-        <button onClick={deleteCheckin} className="btn btn-danger btn-sm w-full">Check-in verwijderen</button>
+        <div className="flex gap-2">
+          <Link to={`/checkin/${checkin.id}/edit`} className="btn btn-soft btn-sm flex-1">✏️ Bewerken / mensen taggen</Link>
+          <button onClick={deleteCheckin} className="btn btn-danger btn-sm flex-1">Verwijderen</button>
+        </div>
       )}
     </div>
   )

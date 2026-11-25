@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CameraIcon, XIcon } from '../components/Icons'
 import { PeoplePicker, type PersonPick } from '../components/PeoplePicker'
 import { StarInput } from '../components/Stars'
+import { Spinner } from '../components/Spinner'
 import { StrainPicker } from '../components/StrainPicker'
 import { useMe } from '../lib/auth'
 import { METHODS } from '../lib/constants'
 import { splitFriendships, useFriendships } from '../lib/friends'
 import { resizeImage } from '../lib/image'
-import { CHECKIN_SELECT, normalizeCheckin } from '../lib/queries'
+import { CHECKIN_SELECT, normalizeCheckin, personKey } from '../lib/queries'
 import { computeBadges, computeStats } from '../lib/stats'
-import { supabase } from '../lib/supabase'
-import type { Method, Strain } from '../lib/types'
+import { photoUrl, supabase } from '../lib/supabase'
+import type { CheckinPerson, Method, Profile, Strain } from '../lib/types'
 
 const uniq = (xs: (string | null)[]) => {
   const seen = new Map<string, string>()
@@ -19,9 +20,14 @@ const uniq = (xs: (string | null)[]) => {
   return [...seen.values()]
 }
 
+const pickKey = (p: PersonPick) => (p.user ? `u:${p.user.id}` : `n:${(p.name ?? '').trim().toLowerCase()}`)
+const toPick = (p: CheckinPerson): PersonPick =>
+  p.user_id ? { user: p.profile ?? ({ id: p.user_id, username: null, display_name: '?' } as Profile) } : { name: p.name ?? '' }
+
 export function NewCheckin() {
   const me = useMe()
   const navigate = useNavigate()
+  const editId = Number(useParams().id) || null
   const { rows } = useFriendships()
   const friends = useMemo(() => splitFriendships(rows, me.id).friends, [rows, me.id])
 
@@ -35,6 +41,9 @@ export function NewCheckin() {
   const [buddies, setBuddies] = useState<PersonPick[]>([])
   const [notes, setNotes] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
+  const [keptPhoto, setKeptPhoto] = useState<string | null>(null) // existing photo when editing
+  const [original, setOriginal] = useState<{ people: CheckinPerson[]; photo: string | null } | null>(null)
+  const [loadingEdit, setLoadingEdit] = useState(Boolean(editId))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [past, setPast] = useState<{ shops: string[]; spots: string[] }>({ shops: [], spots: [] })
@@ -46,8 +55,29 @@ export function NewCheckin() {
       .then(({ data }) => setPast({ shops: uniq((data ?? []).map((d) => d.bought_at)), spots: uniq((data ?? []).map((d) => d.smoked_at)) }))
   }, [me.id])
 
-  const preview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo])
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
+  // Editing: load the check-in and fill in the form.
+  useEffect(() => {
+    if (!editId) return
+    supabase.from('checkins').select(CHECKIN_SELECT).eq('id', editId).maybeSingle().then(({ data }) => {
+      const c = data ? normalizeCheckin(data) : null
+      if (!c || c.user_id !== me.id) return navigate(`/checkin/${editId}`, { replace: true })
+      setStrain(c.strain)
+      setMethod(c.method)
+      setRating(c.rating)
+      setBoughtAt(c.bought_at ?? '')
+      setSmokedAt(c.smoked_at ?? '')
+      setNotes(c.notes ?? '')
+      setRoller(c.people.filter((p) => p.role === 'roller').map(toPick))
+      setBuddies(c.people.filter((p) => p.role === 'buddy').map(toPick))
+      setKeptPhoto(c.photo_path)
+      setOriginal({ people: c.people, photo: c.photo_path })
+      setLoadingEdit(false)
+    })
+  }, [editId, me.id, navigate])
+
+  const newPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo])
+  useEffect(() => () => { if (newPreview) URL.revokeObjectURL(newPreview) }, [newPreview])
+  const preview = newPreview ?? (keptPhoto ? photoUrl(keptPhoto) : null)
 
   const rolls = method !== 'edible' && method !== 'vape'
 
@@ -58,12 +88,39 @@ export function NewCheckin() {
     setBusy(true)
     setError('')
     try {
-      let photo_path: string | null = null
+      let photo_path: string | null = keptPhoto
       if (photo) {
         const blob = await resizeImage(photo)
         photo_path = `${me.id}/${crypto.randomUUID()}.jpg`
         const { error } = await supabase.storage.from('photos').upload(photo_path, blob, { contentType: 'image/jpeg' })
         if (error) throw error
+      }
+
+      if (editId && original) {
+        const { error } = await supabase.from('checkins').update({
+          strain_id: strain.id, method, rating,
+          bought_at: boughtAt.trim() || null, smoked_at: smokedAt.trim() || null,
+          notes: notes.trim() || null, photo_path,
+        }).eq('id', editId)
+        if (error) throw error
+
+        // Only add new tags and remove dropped ones; untouched tags stay as they are.
+        const wanted = [...(rolls ? roller.map((p) => ({ role: 'roller' as const, p })) : []), ...buddies.map((p) => ({ role: 'buddy' as const, p }))]
+        const wantedKeys = new Set(wanted.map((w) => `${w.role}|${pickKey(w.p)}`))
+        const haveKeys = new Set(original.people.map((x) => `${x.role}|${personKey(x)}`))
+        const toAdd = wanted.filter((w) => !haveKeys.has(`${w.role}|${pickKey(w.p)}`))
+          .map((w) => ({ checkin_id: editId, role: w.role, user_id: w.p.user?.id ?? null, name: w.p.user ? null : w.p.name }))
+        const toRemove = original.people.filter((x) => !wantedKeys.has(`${x.role}|${personKey(x)}`)).map((x) => x.id)
+        if (toAdd.length) {
+          const { error } = await supabase.from('checkin_people').insert(toAdd)
+          if (error) throw error
+        }
+        if (toRemove.length) {
+          const { error } = await supabase.from('checkin_people').delete().in('id', toRemove)
+          if (error) throw error
+        }
+        if (original.photo && original.photo !== photo_path) await supabase.storage.from('photos').remove([original.photo])
+        return navigate(`/checkin/${editId}`, { replace: true })
       }
 
       const { data: created, error } = await supabase.from('checkins').insert({
@@ -99,9 +156,11 @@ export function NewCheckin() {
     }
   }
 
+  if (loadingEdit) return <Spinner />
+
   return (
     <form onSubmit={submit} className="space-y-6">
-      <h1 className="page-title">Nieuwe check-in</h1>
+      <h1 className="page-title">{editId ? 'Check-in bewerken' : 'Nieuwe check-in'}</h1>
 
       <section>
         <label className="label">Wat rook je?</label>
@@ -165,7 +224,7 @@ export function NewCheckin() {
         {preview ? (
           <div className="relative overflow-hidden rounded-3xl">
             <img src={preview} alt="Gekozen foto" className="max-h-80 w-full object-cover" />
-            <button type="button" onClick={() => setPhoto(null)} aria-label="Foto weghalen"
+            <button type="button" onClick={() => { setPhoto(null); setKeptPhoto(null) }} aria-label="Foto weghalen"
               className="absolute right-3 top-3 rounded-full bg-white/90 p-2 shadow"><XIcon className="size-5" /></button>
           </div>
         ) : (
@@ -179,7 +238,7 @@ export function NewCheckin() {
       {error && <p className="rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
 
       <button className="btn btn-primary w-full py-4 text-lg" disabled={busy}>
-        {busy ? 'Inchecken…' : 'Inchecken 🌿'}
+        {editId ? (busy ? 'Opslaan…' : 'Wijzigingen opslaan ✏️') : busy ? 'Inchecken…' : 'Inchecken 🌿'}
       </button>
     </form>
   )

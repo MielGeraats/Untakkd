@@ -53,8 +53,9 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Feed />} />
-        <Route path="checkin/new" element={<NewCheckin />} />
+        <Route path="checkin/new" element={<NewCheckin key="new" />} />
         <Route path="checkin/:id" element={<CheckinDetail />} />
+        <Route path="checkin/:id/edit" element={<NewCheckin key="edit" />} />
         <Route path="u/:username" element={<ProfilePage />} />
         <Route path="friends" element={<Friends />} />
         <Route path="strains" element={<Strains />} />
