@@ -13,8 +13,8 @@ import { computeBadges, computeStats } from '../lib/stats'
 import { supabase } from '../lib/supabase'
 import type { Checkin, Profile } from '../lib/types'
 
-type Tab = 'activity' | 'stats' | 'badges'
-const TAB_LABELS: Record<Tab, string> = { activity: 'Activiteit', stats: 'Stats', badges: 'Badges' }
+type Tab = 'activity' | 'stats' | 'badges' | 'friends'
+const TAB_LABELS: Record<Tab, string> = { activity: 'Activiteit', stats: 'Stats', badges: 'Badges', friends: 'Maten' }
 
 export function ProfilePage() {
   const { username } = useParams()
@@ -101,7 +101,7 @@ export function ProfilePage() {
       ) : (
         <>
           <div className="mb-4 flex rounded-full bg-leaf-100 p-1">
-            {(['activity', 'stats', 'badges'] as Tab[]).map((t) => (
+            {(['activity', 'stats', 'badges', 'friends'] as Tab[]).map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`flex-1 rounded-full py-2 text-sm font-extrabold transition ${tab === t ? 'bg-white text-leaf-800 shadow-sm' : 'text-leaf-800/50'}`}>
                 {TAB_LABELS[t]}
@@ -116,6 +116,8 @@ export function ProfilePage() {
           )}
 
           {tab === 'stats' && <StatsView stats={stats} />}
+
+          {tab === 'friends' && <FriendsOf user={user} isMe={relation.kind === 'self'} />}
 
           {tab === 'badges' && (
             <div className="grid grid-cols-2 gap-3">
@@ -198,5 +200,52 @@ function StatsView({ stats }: { stats: ReturnType<typeof computeStats> }) {
         <p>⭐ <b>{stats.fiveStars}</b> keer de volle 5 sterren uitgedeeld</p>
       </div>
     </div>
+  )
+}
+
+function FriendsOf({ user, isMe }: { user: Profile; isMe: boolean }) {
+  const me = useMe()
+  const { rows, reload } = useFriendships()
+  const [list, setList] = useState<Profile[] | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setList(null)
+    supabase.rpc('friends_of', { uid: user.id }).then(({ data, error }) => {
+      if (error) setError(error.message)
+      setList((data ?? []) as Profile[])
+    })
+  }, [user.id])
+
+  if (error) return <Empty emoji="🛠️" title="Maten laden lukt niet">{error}</Empty>
+  if (!list) return <Spinner />
+  const name = user.display_name?.split(' ')[0] || user.username
+  if (list.length === 0) {
+    return <Empty emoji="🦗" title={isMe ? 'Je hebt nog geen maten' : `${name} heeft nog geen maten`}>Eenzaam blowen is ook maar niks.</Empty>
+  }
+
+  const newOnes = list.filter((p) => relationTo(rows, me.id, p.id).kind === 'none').length
+  return (
+    <section className="card px-4 py-2">
+      {!isMe && newOnes > 0 && (
+        <p className="py-2 text-sm text-leaf-800/60">
+          {newOnes} {newOnes === 1 ? 'maat' : 'maten'} van {name} ken je nog niet op Untakkd. Hup, toevoegen!
+        </p>
+      )}
+      <ul className="divide-y divide-leaf-50">
+        {list.map((p) => (
+          <li key={p.id} className="flex items-center gap-3 py-2">
+            <Link to={`/u/${p.username}`} className="flex min-w-0 flex-1 items-center gap-3">
+              <Avatar profile={p} size="sm" />
+              <span className="min-w-0">
+                <span className="block truncate font-extrabold">{p.id === me.id ? 'Jij 😎' : p.display_name || p.username}</span>
+                <span className="block truncate text-xs font-bold text-leaf-800/50">@{p.username}</span>
+              </span>
+            </Link>
+            <FriendButton relation={relationTo(rows, me.id, p.id)} userId={p.id} onChange={reload} />
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
