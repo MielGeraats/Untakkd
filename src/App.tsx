@@ -1,8 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { useEffect, useState } from 'react'
 import { Spinner } from './components/Spinner'
 import { useAuth } from './lib/auth'
-import { isConfigured } from './lib/supabase'
+import { isConfigured, supabase } from './lib/supabase'
 import { CheckinDetail } from './pages/CheckinDetail'
 import { Feed } from './pages/Feed'
 import { Friends } from './pages/Friends'
@@ -16,12 +17,36 @@ import { StrainDetail } from './pages/StrainDetail'
 import { Strains } from './pages/Strains'
 
 export default function App() {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, profileError, refreshProfile } = useAuth()
+  const [slow, setSlow] = useState(false)
+  const [tries, setTries] = useState(0)
+
+  // If the profile hasn't shown up after a while, offer a way out instead of spinning forever.
+  useEffect(() => {
+    setSlow(false)
+    if (!session || profile) return
+    const t = setTimeout(() => setSlow(true), 8000)
+    return () => clearTimeout(t)
+  }, [session, profile, tries])
 
   if (!isConfigured) return <SetupNeeded />
   if (loading) return <Spinner label="Even eentje draaien…" />
   if (!session) return <Login />
-  if (!profile) return <Spinner label="Je profiel wordt opgehaald…" />
+  if (!profile) {
+    if (!profileError && !slow) return <Spinner label="Je profiel wordt opgehaald…" />
+    return (
+      <div className="mx-auto max-w-sm px-6 py-20 text-center">
+        <div className="mb-3 text-5xl">😵‍💫</div>
+        <h1 className="text-2xl font-black">Oeps, je profiel laadt niet</h1>
+        <p className="mt-2 text-sm text-leaf-800/70">Probeer het opnieuw, of log uit en weer in.</p>
+        {profileError && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-xs text-red-700">{profileError}</p>}
+        <div className="mt-6 flex justify-center gap-2">
+          <button className="btn btn-primary btn-sm" onClick={() => { setTries((n) => n + 1); refreshProfile() }}>Opnieuw proberen</button>
+          <button className="btn btn-soft btn-sm" onClick={() => supabase.auth.signOut()}>Uitloggen</button>
+        </div>
+      </div>
+    )
+  }
   if (!profile.username) return <Onboarding />
 
   return (

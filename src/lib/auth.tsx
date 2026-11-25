@@ -7,6 +7,7 @@ type AuthState = {
   session: Session | null
   profile: Profile | null
   loading: boolean
+  profileError: string
   refreshProfile: () => Promise<void>
 }
 
@@ -16,10 +17,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profileError, setProfileError] = useState('')
 
   const loadProfile = useCallback(async (uid?: string) => {
+    setProfileError('')
     if (!uid) return setProfile(null)
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle()
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle()
+    if (error) setProfileError(error.message)
+    else if (!data) setProfileError('Er bestaat nog geen profiel voor dit account.')
     setProfile(data)
   }, [])
 
@@ -39,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(() => loadProfile(session?.user.id), [loadProfile, session])
 
-  return <AuthContext.Provider value={{ session, profile, loading, refreshProfile }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ session, profile, loading, profileError, refreshProfile }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
