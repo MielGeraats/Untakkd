@@ -3,18 +3,26 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useMe } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { Avatar } from './Avatar'
-import { HomeIcon, LeafIcon, PlusIcon, UserIcon, UsersIcon } from './Icons'
+import { BellIcon, HomeIcon, LeafIcon, PlusIcon, UserIcon, UsersIcon } from './Icons'
 
 export function Layout() {
   const me = useMe()
   const { pathname } = useLocation()
   const [requests, setRequests] = useState(0)
+  const [tags, setTags] = useState(0)
 
   useEffect(() => {
     supabase.from('friendships').select('id', { count: 'exact', head: true })
       .eq('addressee_id', me.id).eq('status', 'pending')
       .then(({ count }) => setRequests(count ?? 0))
   }, [me.id, pathname])
+
+  // New tags in other people's check-ins since you last opened Meldingen.
+  useEffect(() => {
+    supabase.from('checkin_people').select('id, checkin:checkins!inner(user_id)', { count: 'exact', head: true })
+      .eq('user_id', me.id).neq('checkin.user_id', me.id).gt('created_at', me.notifications_seen_at ?? new Date().toISOString())
+      .then(({ count }) => setTags(count ?? 0))
+  }, [me.id, me.notifications_seen_at, pathname])
 
   useEffect(() => window.scrollTo(0, 0), [pathname])
 
@@ -29,7 +37,18 @@ export function Layout() {
             <LeafIcon className="size-7 text-leaf-600" />
             <span className="text-xl font-black tracking-tight">Untakkd</span>
           </Link>
-          <Link to="/settings" aria-label="Instellingen"><Avatar profile={me} size="sm" /></Link>
+          <div className="flex items-center gap-2">
+            <Link to="/meldingen" aria-label={tags ? `Meldingen (${tags} nieuw)` : 'Meldingen'}
+              className="relative rounded-full p-2 text-leaf-700 hover:bg-leaf-100">
+              <BellIcon className="size-6" />
+              {tags > 0 && (
+                <span className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white">
+                  {tags > 9 ? '9+' : tags}
+                </span>
+              )}
+            </Link>
+            <Link to="/settings" aria-label="Instellingen"><Avatar profile={me} size="sm" /></Link>
+          </div>
         </div>
       </header>
 

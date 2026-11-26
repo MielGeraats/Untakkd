@@ -9,6 +9,7 @@ import { Feed } from './pages/Feed'
 import { Friends } from './pages/Friends'
 import { Login } from './pages/Login'
 import { NewCheckin } from './pages/NewCheckin'
+import { Notifications } from './pages/Notifications'
 import { Onboarding } from './pages/Onboarding'
 import { PlaceDetail } from './pages/PlaceDetail'
 import { ProfilePage } from './pages/Profile'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="plek/:name" element={<PlaceDetail kind="spot" key="spot" />} />
         <Route path="shop/:name" element={<PlaceDetail kind="shop" key="shop" />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="meldingen" element={<Notifications />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

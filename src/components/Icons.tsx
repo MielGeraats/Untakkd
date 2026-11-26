@@ -47,3 +47,6 @@ export const LeafIcon = (p: P) => (
     <path d="M-6 0 L6 0 L4 90 L-4 90Z" />
   </svg>
 )
+export const BellIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>
+)
