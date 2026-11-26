@@ -135,6 +135,8 @@ const DEFS: Def[] = [
     desc: '{n} voories', levels: [5, 10, 25, 50], metric: (s) => s.methodCount('voorie') },
   { id: 'edible', emoji: '🍪', titles: ['Koekiemonster', 'Bakker', 'Space Chef', 'Waar is mijn lichaam?'],
     desc: '{n} spacecakes', levels: [3, 10, 25, 50], metric: (s) => s.methodCount('edible') },
+  { id: 'gummy', emoji: '🍬', titles: ['Snoepkont', 'Gummybeer', 'Haribo-sponsor', 'Kinderen in de snoepwinkel'],
+    desc: '{n} gummies', levels: [3, 10, 25, 50], metric: (s) => s.methodCount('gummy') },
   { id: 'topshelf', emoji: '⭐', titles: ['Bovenste Plank', 'Makkelijk Te Pleasen', 'Deelt Sterren uit als Snoep'],
     desc: '{n}× de volle 5 sterren gegeven', levels: [5, 10, 25, 50], metric: (s) => s.fiveStars },
   { id: 'critic', emoji: '🧐', titles: ['Strenge Recensent', 'Gordon Ramsay', 'Niks Is Goed Genoeg'],

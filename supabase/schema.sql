@@ -41,7 +41,7 @@ create table public.checkins (
   user_id    uuid not null default auth.uid() references public.profiles on delete cascade,
   strain_id  bigint not null references public.strains on delete restrict,
   method     text not null default 'joint'
-             check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other')),
+             check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'gummy', 'other')),
   rating     numeric(2,1) not null check (rating between 0.5 and 5 and rating * 2 = floor(rating * 2)),
   bought_at  text check (char_length(bought_at) <= 80),
   smoked_at  text check (char_length(smoked_at) <= 80),
@@ -313,7 +313,7 @@ grant  execute on function public.profile_stats_data(uuid) to authenticated;
 -- Voorie (pre-roll) as a method; already part of the create table above on fresh setups.
 alter table public.checkins drop constraint if exists checkins_method_check;
 alter table public.checkins add constraint checkins_method_check
-  check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other'));
+  check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'gummy', 'other'));
 
 -- "Zelfde rotation" fix. Safe to run more than once (also adds the column if add-sessions.sql never ran).
 alter table public.checkins add column if not exists session_of bigint;
@@ -386,3 +386,8 @@ alter table public.profiles add column if not exists notifications_seen_at times
 grant update (notifications_seen_at) on public.profiles to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- Gummies as a method.
+alter table public.checkins drop constraint if exists checkins_method_check;
+alter table public.checkins add constraint checkins_method_check
+  check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'gummy', 'other'));

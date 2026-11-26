@@ -84,7 +84,7 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
               <Link to={`/u/${c.profile.username}`} className="font-extrabold hover:underline">
                 {c.profile.display_name || c.profile.username}
               </Link>{' '}
-              <span className="text-leaf-800/70">{c.method === 'edible' ? 'smult van' : 'rookt'}</span>{' '}
+              <span className="text-leaf-800/70">{c.method === 'edible' ? 'smult van' : c.method === 'gummy' ? 'kauwt op' : 'rookt'}</span>{' '}
               <Link to={`/strains/${c.strain.id}`} className="font-extrabold text-leaf-700 hover:underline">{c.strain.name}</Link>
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-bold text-leaf-800/60">

@@ -10,6 +10,7 @@ export const METHODS: { id: Method; label: string; emoji: string }[] = [
   { id: 'pipe', label: 'Pijp', emoji: '🪈' },
   { id: 'vape', label: 'Vape', emoji: '💨' },
   { id: 'edible', label: 'Spacecake', emoji: '🍪' },
+  { id: 'gummy', label: 'Gummies', emoji: '🍬' },
   { id: 'other', label: 'Anders', emoji: '✨' },
 ]
 export const methodInfo = (m: Method) => METHODS.find((x) => x.id === m) ?? METHODS[METHODS.length - 1]

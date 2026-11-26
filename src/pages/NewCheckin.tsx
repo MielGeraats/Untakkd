@@ -146,7 +146,7 @@ export function NewCheckin() {
   const preview = newPreview ?? (keptPhoto ? photoUrl(keptPhoto) : null)
 
   // Nobody rolled a voorie (pre-roll), a vape or an edible.
-  const rolls = method !== 'edible' && method !== 'vape' && method !== 'voorie'
+  const rolls = !['edible', 'gummy', 'vape', 'voorie'].includes(method)
 
   async function submit(e: FormEvent) {
     e.preventDefault()

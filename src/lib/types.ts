@@ -18,7 +18,7 @@ export type Strain = {
   created_at: string
 }
 
-export type Method = 'joint' | 'voorie' | 'ringbaap' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'other'
+export type Method = 'joint' | 'voorie' | 'ringbaap' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'gummy' | 'other'
 
 export type CheckinPerson = {
   id: number
