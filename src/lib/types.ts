@@ -4,6 +4,7 @@ export type Profile = {
   display_name: string | null
   avatar_url: string | null
   bio: string | null
+  special_badges?: string[] | null
   created_at: string
 }
 
@@ -16,7 +17,7 @@ export type Strain = {
   created_at: string
 }
 
-export type Method = 'joint' | 'voorie' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'other'
+export type Method = 'joint' | 'voorie' | 'ringbaap' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'other'
 
 export type CheckinPerson = {
   id: number

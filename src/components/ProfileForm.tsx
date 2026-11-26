@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/auth'
+import { AvatarPicker } from './AvatarPicker'
 import { supabase } from '../lib/supabase'
 
 const suggestUsername = (name: string | null) =>
@@ -33,6 +34,7 @@ export function ProfileForm({ submitLabel, onDone }: { submitLabel: string; onDo
 
   return (
     <form onSubmit={save} className="space-y-5">
+      <AvatarPicker />
       <div>
         <label className="label" htmlFor="username">Gebruikersnaam</label>
         <div className="relative">

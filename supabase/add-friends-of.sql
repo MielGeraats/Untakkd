@@ -12,3 +12,6 @@ returns setof public.profiles language sql stable security definer set search_pa
 $$;
 revoke execute on function public.friends_of(uuid) from public, anon;
 grant  execute on function public.friends_of(uuid) to authenticated;
+
+-- Make the API see new functions right away.
+notify pgrst, 'reload schema';

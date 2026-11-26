@@ -215,7 +215,8 @@ export function NewCheckin() {
       const all = (mine ?? []).map(normalizeCheckin)
       const before = computeBadges(computeStats(all.filter((c) => c.id !== created.id), rolledBefore))
       const after = computeBadges(computeStats(all, rolledAfter ?? 0))
-      const unlocked = after.filter((b) => b.earned && !before.find((x) => x.id === b.id)?.earned)
+      // New badges and level-ups.
+      const unlocked = after.filter((b) => b.level > (before.find((x) => x.id === b.id)?.level ?? 0))
 
       navigate(`/checkin/${created.id}`, { replace: true, state: { unlocked } })
     } catch (err) {

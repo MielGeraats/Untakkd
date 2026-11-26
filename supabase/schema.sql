@@ -41,7 +41,7 @@ create table public.checkins (
   user_id    uuid not null default auth.uid() references public.profiles on delete cascade,
   strain_id  bigint not null references public.strains on delete restrict,
   method     text not null default 'joint'
-             check (method in ('joint', 'voorie', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other')),
+             check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other')),
   rating     numeric(2,1) not null check (rating between 0.5 and 5 and rating * 2 = floor(rating * 2)),
   bought_at  text check (char_length(bought_at) <= 80),
   smoked_at  text check (char_length(smoked_at) <= 80),
@@ -313,7 +313,7 @@ grant  execute on function public.profile_stats_data(uuid) to authenticated;
 -- Voorie (pre-roll) as a method; already part of the create table above on fresh setups.
 alter table public.checkins drop constraint if exists checkins_method_check;
 alter table public.checkins add constraint checkins_method_check
-  check (method in ('joint', 'voorie', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other'));
+  check (method in ('joint', 'voorie', 'ringbaap', 'blunt', 'spliff', 'bong', 'pipe', 'vape', 'edible', 'other'));
 
 -- "Zelfde rotation" fix. Safe to run more than once (also adds the column if add-sessions.sql never ran).
 alter table public.checkins add column if not exists session_of bigint;
@@ -335,3 +335,39 @@ grant  execute on function public.can_join_session(bigint) to authenticated;
 drop policy if exists "checkins create" on public.checkins;
 create policy "checkins create" on public.checkins for insert to authenticated
   with check (user_id = auth.uid() and (session_of is null or public.can_join_session(session_of)));
+
+-- Badges: hand-out badges on profiles, and badge data in the public stats. Safe to run more than once.
+alter table public.profiles add column if not exists special_badges text[] not null default '{}';
+
+-- Users may edit their own profile, but not hand themselves badges.
+revoke update on public.profiles from authenticated;
+grant update (username, display_name, bio, avatar_url) on public.profiles to authenticated;
+
+-- The first 5: OG badge for everyone, and the maker badge for the maker.
+update public.profiles set special_badges = array['og']
+  where username in ('baapturner1989', 'blownouts', 'victorrastabos', 'larry');
+update public.profiles set special_badges = array['maker', 'og'] where username = 'mielgerbaaps';
+
+create or replace function public.profile_stats_data(uid uuid)
+returns json language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(json_build_object(
+    'id', c.id, 'user_id', c.user_id, 'strain_id', c.strain_id, 'method', c.method, 'rating', c.rating,
+    'bought_at', c.bought_at, 'smoked_at', c.smoked_at, 'created_at', c.created_at,
+    -- for badges: whether there's a photo / notes (not the content), and rotations
+    'photo_path', case when c.photo_path is not null then 'hidden' end,
+    'notes', case when c.notes is not null then 'hidden' end,
+    'session_of', c.session_of,
+    'strain', json_build_object('id', s.id, 'name', s.name, 'type', s.type),
+    'people', coalesce((
+      select json_agg(json_build_object(
+        'id', cp.id, 'role', cp.role, 'user_id', cp.user_id, 'name', cp.name,
+        'profile', case when p.id is null then null else json_build_object(
+          'id', p.id, 'username', p.username, 'display_name', p.display_name, 'avatar_url', p.avatar_url) end))
+      from checkin_people cp left join profiles p on p.id = cp.user_id
+      where cp.checkin_id = c.id), '[]'::json)
+  ) order by c.created_at desc), '[]'::json)
+  from checkins c join strains s on s.id = c.strain_id
+  where c.user_id = uid;
+$$;
+
+notify pgrst, 'reload schema';

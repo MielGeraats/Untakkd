@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { CheckinCard } from '../components/CheckinCard'
 import { FriendButton } from '../components/FriendButton'
+import { ChevronLeft } from '../components/Icons'
 import { Empty, Spinner } from '../components/Spinner'
 import { Stars } from '../components/Stars'
 import { useMe } from '../lib/auth'
@@ -10,7 +11,7 @@ import { methodInfo } from '../lib/constants'
 import { placeUrl } from '../lib/places'
 import { relationTo, splitFriendships, useFriendships } from '../lib/friends'
 import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
-import { computeBadges, computeStats } from '../lib/stats'
+import { computeBadges, computeStats, specialBadges, type Badge } from '../lib/stats'
 import { supabase } from '../lib/supabase'
 import type { Checkin, Profile } from '../lib/types'
 
@@ -79,7 +80,14 @@ export function ProfilePage() {
   // stats always match the Activiteit tab. Everyone else gets the public stats.
   const source = canSee && checkins ? checkins : statsData
   const stats = useMemo(() => (source ? computeStats(source, rolled) : null), [source, rolled])
-  const badges = useMemo(() => (stats ? computeBadges(stats) : []), [stats])
+  const special = useMemo(() => specialBadges(user?.special_badges), [user])
+  const badges = useMemo(() => {
+    const list = stats ? computeBadges(stats) : []
+    // earned first (highest level first), then the ones you're closest to
+    const progress = (b: Badge) => (b.next ? (b.current - b.from) / (b.next - b.from) : 1)
+    const sorted = [...list].sort((a, b) => Number(b.earned) - Number(a.earned) || b.level - a.level || progress(b) - progress(a))
+    return [...special, ...sorted]
+  }, [stats, special])
 
   if (user === undefined) return <Spinner />
   if (user === null) return <Empty emoji="🤷" title="Hier woont niemand">Er is geen gebruiker die @{username} heet.</Empty>
@@ -95,7 +103,10 @@ export function ProfilePage() {
           <Avatar profile={user} size="lg" />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-2xl font-black leading-tight">{user.display_name || user.username}</h1>
-            <p className="text-sm font-bold text-leaf-800/50">@{user.username}</p>
+            <p className="text-sm font-bold text-leaf-800/50">
+              @{user.username}
+              {special.map((b) => <span key={b.id} title={b.name} className="ml-1.5">{b.emoji}</span>)}
+            </p>
             <div className="mt-2">
               {relation.kind === 'self'
                 ? <Link to="/settings" className="btn btn-soft btn-sm">Profiel bewerken</Link>
@@ -157,19 +168,7 @@ export function ProfilePage() {
 
           {shownTab === 'badges' && (
             <div className="grid grid-cols-2 gap-3">
-              {badges.map((b) => (
-                <div key={b.id} className={`card p-4 ${b.earned ? '' : 'opacity-55'}`}>
-                  <div className={`text-3xl ${b.earned ? '' : 'grayscale'}`}>{b.emoji}</div>
-                  <p className="mt-1 font-black leading-tight">{b.name}</p>
-                  <p className="text-xs text-leaf-800/60">{b.desc}</p>
-                  {!b.earned && (
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-leaf-100">
-                      <div className="h-full rounded-full bg-leaf-500" style={{ width: `${(b.current / b.target) * 100}%` }} />
-                    </div>
-                  )}
-                  {!b.earned && b.target > 1 && <p className="mt-1 text-[11px] font-bold text-leaf-800/50">{b.current} / {b.target}</p>}
-                </div>
-              ))}
+              {badges.map((b) => <BadgeCard key={b.id} b={b} />)}
             </div>
           )}
         </>
@@ -178,60 +177,88 @@ export function ProfilePage() {
   )
 }
 
-function StatsView({ stats }: { stats: ReturnType<typeof computeStats> }) {
-  if (!stats.total) return <Empty emoji="📊" title="Nog geen stats">Check eerst een paar keer in. Huiswerk!</Empty>
-  const top = (list: { label: string; count: number }[], fmt = (s: string) => s) =>
-    list.length ? `${fmt(list[0].label)} (${list[0].count}×)` : '—'
-  const maxMethod = Math.max(...stats.methods.map((m) => m.count))
+type StatRow = { key: string; label: ReactNode; value: ReactNode; share?: number }
+
+/** One stat: shows your number one, tap the arrow to see the full ranking. */
+function ExpandStat({ emoji, title, rows, empty = 'Nog niks' }: { emoji: string; title: string; rows: StatRow[]; empty?: string }) {
+  const [open, setOpen] = useState(false)
+  const more = rows.length > 1
   return (
-    <div className="space-y-4">
-      <div className="card p-4">
-        <h3 className="mb-3 font-black">Best beoordeelde strains</h3>
-        <ol className="space-y-2">
-          {stats.strains.slice(0, 5).map((s, i) => (
-            <li key={s.id} className="flex items-center gap-3">
-              <span className="w-5 text-center font-black text-leaf-500">{i + 1}</span>
-              <Link to={`/strains/${s.id}`} className="min-w-0 flex-1 truncate font-bold hover:underline">{s.name}</Link>
-              <Stars value={s.avg} size={14} />
-              <span className="w-8 text-right text-sm font-black text-leaf-700">{s.avg.toFixed(1)}</span>
+    <div className="card p-4">
+      <button type="button" disabled={!more} onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 text-left disabled:cursor-default" aria-expanded={open}>
+        <p className="flex-1 text-xs font-bold uppercase tracking-wide text-leaf-800/50">{emoji} {title}</p>
+        {more && (
+          <span className="flex items-center gap-1 text-xs font-bold text-leaf-700">
+            {open ? 'Minder' : `Alle ${rows.length}`}
+            <ChevronLeft className={`size-4 transition ${open ? 'rotate-90' : '-rotate-90'}`} />
+          </span>
+        )}
+      </button>
+      {rows.length === 0 ? (
+        <p className="mt-1 font-black text-leaf-800/40">{empty}</p>
+      ) : !open ? (
+        <div className="mt-1 flex items-baseline gap-2">
+          <p className="min-w-0 flex-1 truncate text-lg font-black leading-tight">{rows[0].label}</p>
+          <span className="shrink-0 text-sm font-black text-leaf-700">{rows[0].value}</span>
+        </div>
+      ) : (
+        <ol className="mt-3 space-y-2">
+          {rows.map((r, i) => (
+            <li key={r.key} className="text-sm">
+              <div className="flex items-center gap-3">
+                <span className="w-5 shrink-0 text-center font-black text-leaf-500">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate font-bold">{r.label}</span>
+                <span className="shrink-0 font-black text-leaf-700">{r.value}</span>
+              </div>
+              {r.share !== undefined && (
+                <div className="ml-8 mt-1 h-1.5 overflow-hidden rounded-full bg-leaf-100">
+                  <div className="h-full rounded-full bg-leaf-500" style={{ width: `${r.share * 100}%` }} />
+                </div>
+              )}
             </li>
           ))}
         </ol>
-      </div>
+      )}
+    </div>
+  )
+}
 
-      <div className="grid grid-cols-2 gap-3">
-        {[
-          ['📍', 'Favoriete plek', stats.spots.length
-            ? <Link to={placeUrl('spot', stats.spots[0].label)} className="hover:underline">{top(stats.spots)}</Link> : '—'],
-          ['🛒', 'Vaste shop', stats.shops.length
-            ? <Link to={placeUrl('shop', stats.shops[0].label)} className="hover:underline">{top(stats.shops)}</Link> : '—'],
-          ['🌀', 'Meestal gedraaid door', top(stats.rollers)],
-          ['👥', 'Blowmaatje', top(stats.buddies)],
-        ].map(([emoji, label, value]) => (
-          <div key={label as string} className="card p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-leaf-800/50">{emoji} {label}</p>
-            <p className="mt-1 font-black leading-tight">{value}</p>
-          </div>
-        ))}
-      </div>
+function StatsView({ stats }: { stats: ReturnType<typeof computeStats> }) {
+  if (!stats.total) return <Empty emoji="📊" title="Nog geen stats">Check eerst een paar keer in. Huiswerk!</Empty>
 
-      <div className="card p-4">
-        <h3 className="mb-3 font-black">Zo rook jij</h3>
-        <div className="space-y-2">
-          {stats.methods.map((m) => {
-            const info = methodInfo(m.key as Checkin['method'])
-            return (
-              <div key={m.key} className="flex items-center gap-3 text-sm">
-                <span className="w-20 shrink-0 font-bold">{info.emoji} {info.label}</span>
-                <div className="h-3 flex-1 overflow-hidden rounded-full bg-leaf-100">
-                  <div className="h-full rounded-full bg-leaf-500" style={{ width: `${(m.count / maxMethod) * 100}%` }} />
-                </div>
-                <span className="w-6 text-right font-black text-leaf-700">{m.count}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+  const counted = (list: { key: string; label: string; count: number }[], link?: (label: string) => string): StatRow[] => {
+    const max = Math.max(1, ...list.map((x) => x.count))
+    return list.map((x) => ({
+      key: x.key,
+      label: link ? <Link to={link(x.label)} className="hover:underline">{x.label}</Link> : x.label,
+      value: `${x.count}×`,
+      share: x.count / max,
+    }))
+  }
+  const strainLink = (s: { id: number; name: string }) => <Link to={`/strains/${s.id}`} className="hover:underline">{s.name}</Link>
+  const bestRated: StatRow[] = stats.strains.map((s) => ({
+    key: String(s.id), label: strainLink(s),
+    value: <span className="inline-flex items-center gap-1.5"><Stars value={s.avg} size={12} />{s.avg.toFixed(1)}</span>,
+  }))
+  const maxStrain = Math.max(1, ...stats.strains.map((s) => s.count))
+  const mostSmoked: StatRow[] = [...stats.strains].sort((a, b) => b.count - a.count || b.avg - a.avg)
+    .map((s) => ({ key: String(s.id), label: strainLink(s), value: `${s.count}×`, share: s.count / maxStrain }))
+  const maxMethod = Math.max(1, ...stats.methods.map((m) => m.count))
+  const methods: StatRow[] = stats.methods.map((m) => {
+    const info = methodInfo(m.key as Checkin['method'])
+    return { key: m.key, label: `${info.emoji} ${info.label}`, value: `${m.count}×`, share: m.count / maxMethod }
+  })
+
+  return (
+    <div className="space-y-3">
+      <ExpandStat emoji="⭐" title="Best beoordeelde strain" rows={bestRated} />
+      <ExpandStat emoji="🔥" title="Meest gerookte strain" rows={mostSmoked} />
+      <ExpandStat emoji="🚬" title="Zo rook jij" rows={methods} />
+      <ExpandStat emoji="📍" title="Favoriete plek" rows={counted(stats.spots, (l) => placeUrl('spot', l))} empty="Nog geen plekken" />
+      <ExpandStat emoji="🛒" title="Vaste shop" rows={counted(stats.shops, (l) => placeUrl('shop', l))} empty="Nog geen shops" />
+      <ExpandStat emoji="🌀" title="Meestal gedraaid door" rows={counted(stats.rollers)} empty="Nog niemand getagd" />
+      <ExpandStat emoji="👥" title="Blowmaatje" rows={counted(stats.buddies)} empty="Nog niemand getagd" />
 
       <div className="card p-4 text-sm">
         <p>🌀 <b>{stats.rolledCount}</b> keer de draaier geweest</p>
@@ -285,5 +312,33 @@ function FriendsOf({ user, isMe }: { user: Profile; isMe: boolean }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+function BadgeCard({ b }: { b: Badge }) {
+  const pct = b.next ? ((b.current - b.from) / (b.next - b.from)) * 100 : 100
+  const maxed = b.earned && !b.next
+  return (
+    <div className={`card relative p-4 ${b.special ? 'border-amber-300 bg-gradient-to-br from-amber-100 to-white' : b.earned ? '' : 'opacity-55'}`}>
+      {b.earned && b.maxLevel > 1 && (
+        <span className={`absolute right-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-black ${maxed ? 'bg-amber-400 text-white' : 'bg-leaf-600 text-white'}`}>
+          {maxed ? 'MAX 👑' : `LVL ${b.level}`}
+        </span>
+      )}
+      {b.special && <span className="absolute right-3 top-3 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-white">UNIEK</span>}
+      <div className={`text-3xl ${b.earned ? '' : 'grayscale'}`}>{b.emoji}</div>
+      <p className="mt-1 font-black leading-tight">{b.name}</p>
+      <p className="text-xs text-leaf-800/60">{b.desc}</p>
+      {!b.special && !maxed && (
+        <>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-leaf-100">
+            <div className="h-full rounded-full bg-leaf-500" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-1 text-[11px] font-bold text-leaf-800/50">
+            {b.current} / {b.next} {b.earned ? `→ Lvl ${b.level + 1}` : ''}
+          </p>
+        </>
+      )}
+    </div>
   )
 }

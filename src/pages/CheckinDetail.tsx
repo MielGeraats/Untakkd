@@ -66,12 +66,17 @@ export function CheckinDetail() {
 
       {unlocked.length > 0 && (
         <div className="card border-leaf-300 bg-gradient-to-br from-leaf-100 to-white p-4">
-          <p className="mb-2 font-black">🎉 Nieuwe badge{unlocked.length > 1 ? 's' : ''} binnen! Proost!</p>
+          <p className="mb-2 font-black">
+            {unlocked.every((b) => b.level === 1) ? `🎉 Nieuwe badge${unlocked.length > 1 ? 's' : ''} binnen! Proost!` : '🚀 Level up! Proost!'}
+          </p>
           <div className="flex flex-wrap gap-3">
             {unlocked.map((b) => (
               <div key={b.id} className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm">
                 <span className="text-2xl">{b.emoji}</span>
-                <div><p className="text-sm font-black leading-tight">{b.name}</p><p className="text-xs text-leaf-800/60">{b.desc}</p></div>
+                <div>
+                  <p className="text-sm font-black leading-tight">{b.name} {b.maxLevel > 1 && <span className="text-leaf-600">· Lvl {b.level}</span>}</p>
+                  <p className="text-xs text-leaf-800/60">{b.next ? `Volgende level: ${b.next}` : b.maxLevel > 1 ? 'MAX level gehaald 👑' : b.desc}</p>
+                </div>
               </div>
             ))}
           </div>
