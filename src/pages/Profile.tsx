@@ -9,6 +9,7 @@ import { Stars } from '../components/Stars'
 import { useMe } from '../lib/auth'
 import { methodInfo } from '../lib/constants'
 import { placeUrl } from '../lib/places'
+import { getRolledCount } from '../lib/rolls'
 import { relationTo, splitFriendships, useFriendships } from '../lib/friends'
 import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import { computeBadges, computeStats, specialBadges, type Badge } from '../lib/stats'
@@ -51,12 +52,12 @@ export function ProfilePage() {
     let stale = false
     Promise.all([
       supabase.rpc('profile_stats_data', { uid: user.id }),
-      supabase.rpc('rolled_count', { uid: user.id }),
+      getRolledCount(user.id),
     ]).then(([a, b]) => {
       if (stale) return
       if (a.error) setStatsError(a.error.message)
       setStatsData(((a.data ?? []) as unknown[]).map(normalizeCheckin))
-      setRolled(b.data ?? 0)
+      setRolled(b)
     })
     return () => { stale = true }
   }, [user])

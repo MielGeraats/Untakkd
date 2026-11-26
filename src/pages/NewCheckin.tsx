@@ -12,6 +12,7 @@ import { METHODS } from '../lib/constants'
 import { splitFriendships, useFriendships } from '../lib/friends'
 import { resizeImage } from '../lib/image'
 import { CHECKIN_SELECT, normalizeCheckin, personKey, sessionKey } from '../lib/queries'
+import { getRolledCount } from '../lib/rolls'
 import { computeBadges, computeStats } from '../lib/stats'
 import { photoUrl, supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/time'
@@ -189,7 +190,7 @@ export function NewCheckin() {
         return navigate(`/checkin/${editId}`, { replace: true })
       }
 
-      const rolledBefore = (await supabase.rpc('rolled_count', { uid: me.id })).data ?? 0
+      const rolledBefore = await getRolledCount(me.id)
 
       const { data: created, error } = await supabase.from('checkins').insert({
         strain_id: strain.id, method, rating,
@@ -208,13 +209,13 @@ export function NewCheckin() {
       }
 
       // Work out which badges this check-in unlocked.
-      const [{ data: mine }, { data: rolledAfter }] = await Promise.all([
+      const [{ data: mine }, rolledAfter] = await Promise.all([
         supabase.from('checkins').select(CHECKIN_SELECT).eq('user_id', me.id),
-        supabase.rpc('rolled_count', { uid: me.id }),
+        getRolledCount(me.id),
       ])
       const all = (mine ?? []).map(normalizeCheckin)
       const before = computeBadges(computeStats(all.filter((c) => c.id !== created.id), rolledBefore))
-      const after = computeBadges(computeStats(all, rolledAfter ?? 0))
+      const after = computeBadges(computeStats(all, rolledAfter))
       // New badges and level-ups.
       const unlocked = after.filter((b) => b.level > (before.find((x) => x.id === b.id)?.level ?? 0))
 
