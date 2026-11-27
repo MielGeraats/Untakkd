@@ -20,7 +20,11 @@ const spotKey = (s: string | null) => (s?.trim() ? s.trim().toLowerCase() : null
 export type UserStats = ReturnType<typeof computeStats>
 
 /** checkins: the user's own check-ins. rolledCount: times the user was tagged as roller (by anyone). */
-export function computeStats(checkins: Checkin[], rolledCount: number) {
+export type GameTotals = { games: number; poffen: number; bouncers: number; palindromen: number; jillas: number }
+const NO_GAMES: GameTotals = { games: 0, poffen: 0, bouncers: 0, palindromen: 0, jillas: 0 }
+
+/** game: De Baapring career totals (optional; badges for the game stay at 0 without it). */
+export function computeStats(checkins: Checkin[], rolledCount: number, game: GameTotals = NO_GAMES) {
   const ratings = checkins.map((c) => c.rating)
   const byStrain = new Map<number, { name: string; id: number; ratings: number[] }>()
   for (const c of checkins) {
@@ -48,6 +52,7 @@ export function computeStats(checkins: Checkin[], rolledCount: number) {
   const when = checkins.map((c) => new Date(c.created_at))
 
   return {
+    game,
     methodCount,
     photos: checkins.filter((c) => c.photo_path).length,
     withNotes: checkins.filter((c) => c.notes).length,
@@ -153,6 +158,17 @@ const DEFS: Def[] = [
     desc: '{n}× inchecken tussen 5 en 9 uur ’s ochtends. Collegeklaar.', levels: [1, 5, 10, 25], metric: (s) => s.wakeAndBake },
   { id: 'weekend', emoji: '🍻', titles: ['Weekendstrijder', 'Zaterdagkoning', 'Leeft voor het Weekend'],
     desc: '{n} check-ins in het weekend', levels: [10, 25, 50, 100], metric: (s) => s.weekend },
+  // De Baapring
+  { id: 'ring-games', emoji: '💍', titles: ['Ringdrager', 'Ringmeester', 'Heer van de Ring', 'Sauron'],
+    desc: '{n} potjes De Baapring', levels: [1, 5, 10, 25, 50], metric: (s) => s.game.games },
+  { id: 'ring-palindromen', emoji: '🪞', titles: ['Palindroom-prins', 'Spiegelkoning', 'Kajak-kampioen', 'Legende van de Lepel'],
+    desc: '{n} palindromen in De Baapring', levels: [1, 5, 10, 25], metric: (s) => s.game.palindromen },
+  { id: 'ring-bouncers', emoji: '🔁', titles: ['Bouncer-baas', 'Boemerang', 'Jojo', 'Trampolinekoning'],
+    desc: '{n} bouncers in De Baapring', levels: [5, 25, 50, 100], metric: (s) => s.game.bouncers },
+  { id: 'ring-poffen', emoji: '💨', titles: ['Poffer', 'Pofmachine', 'Longen van Staal', 'Stoomlocomotief'],
+    desc: '{n} poffen in De Baapring', levels: [25, 100, 250, 500], metric: (s) => s.game.poffen },
+  { id: 'ring-jilla', emoji: '👮', titles: ['Jilla-magneet', 'Vaste Klant bij de Jilla', 'Jilla-veteraan', 'Woont in de Jilla'],
+    desc: '{n} keer Jilla. Trots op?', levels: [5, 25, 50, 100], metric: (s) => s.game.jillas },
   { id: 'monday', emoji: '😩', titles: ['Maandagochtendblues', 'Haat Maandagen', 'Garfield'],
     desc: '{n}× op maandagochtend ingecheckt', levels: [1, 5, 10], metric: (s) => s.mondayMornings },
 ]

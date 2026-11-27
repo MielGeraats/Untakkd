@@ -5,6 +5,7 @@ import { ErrorBox } from '../components/BugNote'
 import { InstallHint } from '../components/InstallHint'
 import { Empty, Spinner } from '../components/Spinner'
 import { useMe } from '../lib/auth'
+import { canSeeBaapring } from '../lib/baapring'
 import { CHECKIN_SELECT, normalizeCheckin, withSessions } from '../lib/queries'
 import { supabase } from '../lib/supabase'
 import type { Checkin } from '../lib/types'
@@ -36,6 +37,14 @@ export function Feed() {
   return (
     <div>
       <InstallHint />
+      {canSeeBaapring(me) && <Link to="/baapring" className="card mb-4 flex items-center gap-3 border-amber-300 bg-gradient-to-r from-amber-50 to-white p-4 hover:bg-white">
+        <span className="text-3xl">💍</span>
+        <span className="flex-1">
+          <span className="block font-black">De Baapring</span>
+          <span className="block text-sm text-leaf-800/60">Het woordspel van de kring. Wie wordt Ringmeester?</span>
+        </span>
+        <span className="font-black text-amber-500">Spelen →</span>
+      </Link>}
       <div className="mb-4 flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight">Recente activiteit</h1>

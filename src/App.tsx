@@ -5,6 +5,9 @@ import { Spinner } from './components/Spinner'
 import { BugNote } from './components/BugNote'
 import { useAuth } from './lib/auth'
 import { isConfigured, supabase } from './lib/supabase'
+import { canSeeBaapring } from './lib/baapring'
+import { Baapring } from './pages/Baapring'
+import { BaapringVragen } from './pages/BaapringVragen'
 import { CheckinDetail } from './pages/CheckinDetail'
 import { Feed } from './pages/Feed'
 import { Friends } from './pages/Friends'
@@ -68,6 +71,8 @@ export default function App() {
         <Route path="shop/:name" element={<PlaceDetail kind="shop" key="shop" />} />
         <Route path="settings" element={<Settings />} />
         <Route path="meldingen" element={<Notifications />} />
+        {canSeeBaapring(profile) && <Route path="baapring" element={<Baapring />} />}
+        {canSeeBaapring(profile) && <Route path="baapring/vragen" element={<BaapringVragen />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

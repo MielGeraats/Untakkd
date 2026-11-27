@@ -9,6 +9,7 @@ import { Empty, Spinner } from '../components/Spinner'
 import { Stars } from '../components/Stars'
 import { useMe } from '../lib/auth'
 import { methodInfo } from '../lib/constants'
+import { canSeeBaapring, fetchCareers, type Career } from '../lib/baapring'
 import { placeUrl } from '../lib/places'
 import { getRolledCount } from '../lib/rolls'
 import { relationTo, splitFriendships, useFriendships } from '../lib/friends'
@@ -28,6 +29,7 @@ export function ProfilePage() {
   const [checkins, setCheckins] = useState<Checkin[] | null>(null) // full check-ins, friends only
   const [statsData, setStatsData] = useState<Checkin[] | null>(null) // public, just what the stats need
   const [rolled, setRolled] = useState(0)
+  const [career, setCareer] = useState<Career | null>(null)
   const [tab, setTab] = useState<Tab>('activity')
 
   const [statsError, setStatsError] = useState('')
@@ -54,11 +56,13 @@ export function ProfilePage() {
     Promise.all([
       supabase.rpc('profile_stats_data', { uid: user.id }),
       getRolledCount(user.id),
-    ]).then(([a, b]) => {
+      canSeeBaapring(me) ? fetchCareers([user.id]).catch(() => new Map<string, Career>()) : Promise.resolve(new Map<string, Career>()), // De Baapring
+    ]).then(([a, b, c]) => {
       if (stale) return
       if (a.error) setStatsError(a.error.message)
       setStatsData(((a.data ?? []) as unknown[]).map(normalizeCheckin))
       setRolled(b)
+      setCareer(c.get(user.id) ?? null)
     })
     return () => { stale = true }
   }, [user])
@@ -81,15 +85,15 @@ export function ProfilePage() {
   // When you can see the full check-ins (your own profile or a friend's), count from those, so the
   // stats always match the Activiteit tab. Everyone else gets the public stats.
   const source = canSee && checkins ? checkins : statsData
-  const stats = useMemo(() => (source ? computeStats(source, rolled) : null), [source, rolled])
+  const stats = useMemo(() => (source ? computeStats(source, rolled, career ?? undefined) : null), [source, rolled, career])
   const special = useMemo(() => specialBadges(user?.special_badges), [user])
   const badges = useMemo(() => {
-    const list = stats ? computeBadges(stats) : []
+    const list = (stats ? computeBadges(stats) : []).filter((b) => canSeeBaapring(me) || !b.id.startsWith('ring-'))
     // earned first (highest level first), then the ones you're closest to
     const progress = (b: Badge) => (b.next ? (b.current - b.from) / (b.next - b.from) : 1)
     const sorted = [...list].sort((a, b) => Number(b.earned) - Number(a.earned) || b.level - a.level || progress(b) - progress(a))
     return [...special, ...sorted]
-  }, [stats, special])
+  }, [stats, special, me])
 
   if (user === undefined) return <Spinner />
   if (user === null) return <Empty emoji="🤷" title="Hier woont niemand">Er is geen gebruiker die @{username} heet.</Empty>
@@ -164,7 +168,7 @@ export function ProfilePage() {
               : <div className="space-y-4">{checkins.map((c) => <CheckinCard key={c.id} c={c} />)}</div>
           )}
 
-          {shownTab === 'stats' && <StatsView stats={stats} />}
+          {shownTab === 'stats' && <>{career && <RingCard c={career} />}<StatsView stats={stats} /></>}
 
           {shownTab === 'friends' && <FriendsOf user={user} isMe={relation.kind === 'self'} />}
 
@@ -342,5 +346,25 @@ function BadgeCard({ b }: { b: Badge }) {
         </>
       )}
     </div>
+  )
+}
+
+/** De Baapring career on the profile. */
+function RingCard({ c }: { c: Career }) {
+  return (
+    <Link to="/baapring" className="card mb-3 block border-amber-300 bg-gradient-to-br from-amber-50 to-white p-4">
+      <div className="flex items-center justify-between">
+        <p className="font-black">💍 De Baapring</p>
+        <p className="text-sm font-black text-amber-600">ELO {Math.round(c.elo)}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-5 gap-1 text-center">
+        {[[c.games, 'potjes'], [c.poffen, 'poffen'], [c.bouncers, 'bouncers'], [c.palindromen, 'palindr.'], [c.jillas, 'jilla']].map(([v, l]) => (
+          <div key={l} className="rounded-xl bg-white/70 py-1.5">
+            <p className="font-black text-leaf-700">{v}</p>
+            <p className="text-[10px] font-bold uppercase text-leaf-800/50">{l}</p>
+          </div>
+        ))}
+      </div>
+    </Link>
   )
 }

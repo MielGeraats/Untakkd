@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useMe } from '../lib/auth'
+import { canSeeBaapring } from '../lib/baapring'
 import { countNew } from '../lib/notifications'
 import { supabase } from '../lib/supabase'
 import { Avatar } from './Avatar'
@@ -39,7 +40,8 @@ export function Layout() {
             <LeafIcon className="size-7 text-leaf-600" />
             <span className="text-xl font-black tracking-tight">Untakkd</span>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {canSeeBaapring(me) && <Link to="/baapring" aria-label="De Baapring" className="rounded-full p-2 text-xl leading-none hover:bg-leaf-100">💍</Link>}
             <Link to="/meldingen" aria-label={tags ? `Meldingen (${tags} nieuw)` : 'Meldingen'}
               className="relative rounded-full p-2 text-leaf-700 hover:bg-leaf-100">
               <BellIcon className="size-6" />
