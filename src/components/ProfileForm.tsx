@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/auth'
+import { ErrorBox } from './BugNote'
 import { AvatarPicker } from './AvatarPicker'
 import { supabase } from '../lib/supabase'
 
@@ -14,6 +15,7 @@ export function ProfileForm({ submitLabel, onDone }: { submitLabel: string; onDo
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [taken, setTaken] = useState(false) // username taken = your problem, not a bug
 
   const validUsername = /^[a-z0-9_]{3,20}$/.test(username)
 
@@ -26,6 +28,7 @@ export function ProfileForm({ submitLabel, onDone }: { submitLabel: string; onDo
       .update({ username, display_name: displayName.trim() || null, bio: bio.trim() || null })
       .eq('id', profile.id)
     setBusy(false)
+    setTaken(error?.code === '23505')
     if (error) return setError(error.code === '23505' ? 'Die naam is al bezet, iemand was je voor. Probeer een andere.' : error.message)
     setSaved(true)
     await refreshProfile()
@@ -56,7 +59,7 @@ export function ProfileForm({ submitLabel, onDone }: { submitLabel: string; onDo
         <textarea id="bio" className="input min-h-20" maxLength={160} value={bio} placeholder="Overdag sativa, ’s avonds indica 🌙"
           onChange={(e) => { setBio(e.target.value); setSaved(false) }} />
       </div>
-      {error && <p className="text-sm font-bold text-red-600">{error}</p>}
+      {error && <ErrorBox bug={!taken}>{error}</ErrorBox>}
       <button className="btn btn-primary w-full py-3" disabled={busy || !validUsername}>
         {busy ? 'Opslaan…' : saved ? 'Opgeslagen ✓' : submitLabel}
       </button>

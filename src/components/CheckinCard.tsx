@@ -35,8 +35,11 @@ function PeopleList({ people }: { people: CheckinPerson[] }) {
 
 export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Checkin; commentCount?: number; linkToDetail?: boolean }) {
   const me = useMe()
-  const [likes, setLikes] = useState(() => c.likes.map((l) => l.user_id))
-  const liked = likes.includes(me.id)
+  // newest first, like Untappd
+  const [likers, setLikers] = useState(() =>
+    [...c.likes].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')))
+  const liked = likers.some((l) => l.user_id === me.id)
+  const likes = likers
   const method = methodInfo(c.method)
   const rollers = c.people.filter((p) => p.role === 'roller')
   const buddies = c.people.filter((p) => p.role === 'buddy')
@@ -47,13 +50,14 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
 
   async function toggleLike() {
     if (liked) {
-      setLikes((l) => l.filter((x) => x !== me.id))
+      const before = likers
+      setLikers((l) => l.filter((x) => x.user_id !== me.id))
       const { error } = await supabase.from('likes').delete().match({ checkin_id: c.id, user_id: me.id })
-      if (error) setLikes((l) => [...l, me.id])
+      if (error) setLikers(before)
     } else {
-      setLikes((l) => [...l, me.id])
+      setLikers((l) => [{ user_id: me.id, created_at: new Date().toISOString(), profile: me }, ...l])
       const { error } = await supabase.from('likes').insert({ checkin_id: c.id })
-      if (error) setLikes((l) => l.filter((x) => x !== me.id))
+      if (error) setLikers((l) => l.filter((x) => x.user_id !== me.id))
     }
   }
 
@@ -120,6 +124,8 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
           className="max-h-[28rem] w-full bg-leaf-100 object-cover" />
       )}
 
+      <Likers likers={likers} meId={me.id} />
+
       <footer className="flex items-center gap-1 border-t border-leaf-100 px-2 py-1.5">
         <button onClick={toggleLike} aria-pressed={liked}
           className={`btn btn-sm ${liked ? 'text-orange-500' : 'text-leaf-700/70'} hover:bg-leaf-50`}>
@@ -141,5 +147,52 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
         {joined && <span className="ml-auto pr-3 text-xs font-bold text-leaf-700/70">🔄 Jij zat erbij</span>}
       </footer>
     </article>
+  )
+}
+
+/** "🔥 Aangestoken door Axel, Jan en 3 anderen", tap to see everyone. */
+function Likers({ likers, meId }: { likers: Checkin['likes']; meId: string }) {
+  const [open, setOpen] = useState(false)
+  if (likers.length === 0) return null
+  // you first, then the rest
+  const list = [...likers.filter((l) => l.user_id === meId), ...likers.filter((l) => l.user_id !== meId)]
+  const name = (l: Checkin['likes'][number]) =>
+    l.user_id === meId ? 'jou' : l.profile?.display_name?.split(' ')[0] || l.profile?.username || 'iemand'
+  const shown = list.slice(0, 2)
+  const rest = list.length - shown.length
+
+  return (
+    <div className="border-t border-leaf-100 px-4 py-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className="flex w-full items-center gap-2 text-left text-sm">
+        <span className="flex shrink-0 -space-x-2">
+          {list.slice(0, 3).map((l) => <Avatar key={l.user_id} profile={l.profile ?? null} size="xs" />)}
+        </span>
+        <span className="min-w-0 flex-1 text-leaf-800/70">
+          🔥 Aangestoken door{' '}
+          {shown.map((l, i) => (
+            <span key={l.user_id}>
+              {i > 0 && (rest === 0 ? ' en ' : ', ')}
+              <b className="text-leaf-900">{name(l)}</b>
+            </span>
+          ))}
+          {rest > 0 && <> en <b className="text-leaf-900">{rest} {rest === 1 ? 'ander' : 'anderen'}</b></>}
+        </span>
+        {list.length > 2 && <span className="shrink-0 text-xs font-bold text-leaf-700">{open ? 'Minder' : 'Alle'}</span>}
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-1.5">
+          {list.map((l) => (
+            <li key={l.user_id}>
+              <Link to={`/u/${l.profile?.username}`} className="flex items-center gap-2 text-sm font-bold hover:underline">
+                <Avatar profile={l.profile ?? null} size="sm" />
+                {l.user_id === meId ? 'Jij' : l.profile?.display_name || l.profile?.username}
+                {l.profile?.username && <span className="text-xs font-semibold text-leaf-800/50">@{l.profile.username}</span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

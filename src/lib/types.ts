@@ -43,7 +43,7 @@ export type Checkin = {
   profile: Profile
   strain: Strain
   people: CheckinPerson[]
-  likes: { user_id: string }[]
+  likes: { user_id: string; created_at?: string; profile?: Profile | null }[]
   comments: { count: number }[]
   /** other people who checked in to the same session (filled by withSessions) */
   session_mates?: Profile[]

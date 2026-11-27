@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { ErrorBox } from '../components/BugNote'
 import { CameraIcon, XIcon } from '../components/Icons'
 import { PeoplePicker, type PersonPick } from '../components/PeoplePicker'
 import { PlaceInput, type PlaceOption } from '../components/PlaceInput'
@@ -64,6 +65,7 @@ export function NewCheckin() {
   const [recent, setRecent] = useState<Checkin[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [bugError, setBugError] = useState(false) // false for "pick a strain first"-type hints
   const [past, setPast] = useState<{ shops: PlaceOption[]; spots: PlaceOption[] }>({ shops: [], spots: [] })
 
   // Suggest places you used before, plus places your friends use (row-level security limits this to check-ins you can see).
@@ -150,6 +152,7 @@ export function NewCheckin() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    setBugError(false)
     if (!strain) return setError('Kies eerst even een strain, maatje.')
     if (!rating) return setError('Geef ’m wel een cijfer (tik op de sterren).')
     setBusy(true)
@@ -223,6 +226,7 @@ export function NewCheckin() {
     } catch (err) {
       // Supabase errors are plain objects with a message, not Error instances, so check for both.
       const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : ''
+      setBugError(true)
       setError(msg ? `Er ging iets mis: ${msg}` : 'Er ging iets mis. Neem een pof en probeer het opnieuw.')
       setBusy(false)
     }
@@ -331,7 +335,7 @@ export function NewCheckin() {
         )}
       </section>
 
-      {error && <p className="rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+      {error && <ErrorBox bug={bugError}>{error}</ErrorBox>}
 
       <button className="btn btn-primary w-full py-4 text-lg" disabled={busy}>
         {editId ? (busy ? 'Opslaan…' : 'Wijzigingen opslaan ✏️') : busy ? 'Inchecken…' : 'Inchecken 🌿'}

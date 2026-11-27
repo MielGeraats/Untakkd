@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth'
 import { squareImage } from '../lib/image'
 import { supabase } from '../lib/supabase'
 import { Avatar } from './Avatar'
+import { ErrorBox } from './BugNote'
 import { CameraIcon } from './Icons'
 
 // Our own uploads live in the "photos" bucket; anything else (old Google pictures) isn't ours to delete.
@@ -62,7 +63,7 @@ export function AvatarPicker() {
         {profile.avatar_url && !busy && (
           <button type="button" onClick={remove} className="mt-1 text-xs font-bold text-leaf-800/50 hover:text-red-600">Foto weghalen</button>
         )}
-        {error && <p className="mt-1 text-xs font-bold text-red-600">{error}</p>}
+        {error && <ErrorBox className="mt-2 text-xs">{error}</ErrorBox>}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { STRAIN_TYPES } from '../lib/constants'
 import { supabase } from '../lib/supabase'
 import type { Strain, StrainType } from '../lib/types'
 import { SearchIcon } from './Icons'
+import { ErrorBox } from './BugNote'
 import { StrainTypePill } from './StrainTypePill'
 
 export function StrainPicker({ value, onChange }: { value: Strain | null; onChange: (s: Strain | null) => void }) {
@@ -85,7 +86,7 @@ export function StrainPicker({ value, onChange }: { value: Strain | null; onChan
                     className={`chip ${newType === t.id ? 'chip-on' : 'chip-off'}`}>{t.label}</button>
                 ))}
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <ErrorBox>{error}</ErrorBox>}
               <button type="button" className="btn btn-primary btn-sm" onClick={create}>Strain toevoegen</button>
             </div>
           )}

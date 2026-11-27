@@ -7,7 +7,7 @@ export const CHECKIN_SELECT = `
   profile:profiles!checkins_user_id_fkey(*),
   strain:strains(*),
   people:checkin_people(id, role, user_id, name, profile:profiles!checkin_people_user_id_fkey(*)),
-  likes(user_id),
+  likes(user_id, created_at, profile:profiles(*)),
   comments(count)
 `
 

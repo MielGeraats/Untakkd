@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { BugNote, ErrorBox } from '../components/BugNote'
 import { CheckinCard } from '../components/CheckinCard'
 import { FriendButton } from '../components/FriendButton'
 import { ChevronLeft } from '../components/Icons'
@@ -154,7 +155,7 @@ export function ProfilePage() {
             <p className="mb-4 text-center text-sm text-leaf-800/60">🔒 Check-ins en maten zie je pas als jullie maten zijn.</p>
           )}
           {!canSee && statsError && (
-            <p className="mb-4 rounded-2xl bg-red-50 p-3 text-xs text-red-700">Stats laden lukt niet: {statsError}</p>
+            <ErrorBox className="mb-4 text-xs">Stats laden lukt niet: {statsError}</ErrorBox>
           )}
 
           {shownTab === 'activity' && checkins && (
@@ -283,7 +284,7 @@ function FriendsOf({ user, isMe }: { user: Profile; isMe: boolean }) {
     })
   }, [user.id])
 
-  if (error) return <Empty emoji="🛠️" title="Maten laden lukt niet">{error}</Empty>
+  if (error) return <Empty emoji="🛠️" title="Maten laden lukt niet">{error}<BugNote className="mt-2" /></Empty>
   if (!list) return <Spinner />
   const name = user.display_name?.split(' ')[0] || user.username
   if (list.length === 0) {

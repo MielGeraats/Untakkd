@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { useEffect, useState } from 'react'
 import { Spinner } from './components/Spinner'
+import { BugNote } from './components/BugNote'
 import { useAuth } from './lib/auth'
 import { isConfigured, supabase } from './lib/supabase'
 import { CheckinDetail } from './pages/CheckinDetail'
@@ -42,6 +43,7 @@ export default function App() {
         <h1 className="text-2xl font-black">Oeps, je profiel laadt niet</h1>
         <p className="mt-2 text-sm text-leaf-800/70">Probeer het opnieuw, of log uit en weer in.</p>
         {profileError && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-xs text-red-700">{profileError}</p>}
+        <BugNote className="mt-3" />
         <div className="mt-6 flex justify-center gap-2">
           <button className="btn btn-primary btn-sm" onClick={() => { setTries((n) => n + 1); refreshProfile() }}>Opnieuw proberen</button>
           <button className="btn btn-soft btn-sm" onClick={() => supabase.auth.signOut()}>Uitloggen</button>

@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react'
+import { ErrorBox } from '../components/BugNote'
 import { LeafIcon } from '../components/Icons'
 import { supabase } from '../lib/supabase'
 
 // Supabase answers in English; translate the ones people actually run into.
+const KNOWN = new Set<string>()
 function dutchError(msg: string) {
   const m = msg.toLowerCase()
-  if (m.includes('expired') || m.includes('invalid')) return 'Die code klopt niet of is verlopen. Vraag een nieuwe aan.'
-  if (m.includes('rate limit') || m.includes('security purposes') || m.includes('too many')) return 'Rustig aan, cowboy. Wacht even en probeer het dan opnieuw.'
-  if (m.includes('email')) return 'Dat e-mailadres klopt niet helemaal. Even checken?'
-  return msg
+  const known = (t: string) => (KNOWN.add(t), t)
+  if (m.includes('expired') || m.includes('invalid')) return known('Die code klopt niet of is verlopen. Vraag een nieuwe aan.')
+  if (m.includes('rate limit') || m.includes('security purposes') || m.includes('too many')) return known('Rustig aan, cowboy. Wacht even en probeer het dan opnieuw.')
+  if (m.includes('email')) return known('Dat e-mailadres klopt niet helemaal. Even checken?')
+  return msg // unknown = probably a real bug
 }
 
 export function Login() {
@@ -94,7 +97,7 @@ export function Login() {
           </div>
         </form>
       )}
-      {error && <p className="mt-4 max-w-xs text-sm text-red-600">{error}</p>}
+      {error && <ErrorBox bug={!KNOWN.has(error)} className="mt-4 max-w-xs">{error}</ErrorBox>}
 
       <p className="mt-12 max-w-xs text-xs text-leaf-800/50">
         Alleen voor 18+, en alleen waar het mag. Je check-ins zijn alleen zichtbaar voor je maten.

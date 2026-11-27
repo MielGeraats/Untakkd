@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useMe } from '../lib/auth'
+import { countNew } from '../lib/notifications'
 import { supabase } from '../lib/supabase'
 import { Avatar } from './Avatar'
 import { BellIcon, HomeIcon, LeafIcon, PlusIcon, UserIcon, UsersIcon } from './Icons'
@@ -17,11 +18,12 @@ export function Layout() {
       .then(({ count }) => setRequests(count ?? 0))
   }, [me.id, pathname])
 
-  // New tags in other people's check-ins since you last opened Meldingen.
+  // Everything new since you last opened Meldingen (tags, 🔥, comments, rotations, friend requests).
   useEffect(() => {
-    supabase.from('checkin_people').select('id, checkin:checkins!inner(user_id)', { count: 'exact', head: true })
-      .eq('user_id', me.id).neq('checkin.user_id', me.id).gt('created_at', me.notifications_seen_at ?? new Date().toISOString())
-      .then(({ count }) => setTags(count ?? 0))
+    if (!me.notifications_seen_at) return setTags(0)
+    let stale = false
+    countNew(me.id, me.notifications_seen_at).then((n) => { if (!stale) setTags(n) }).catch(() => {})
+    return () => { stale = true }
   }, [me.id, me.notifications_seen_at, pathname])
 
   useEffect(() => window.scrollTo(0, 0), [pathname])

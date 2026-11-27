@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckinCard } from '../components/CheckinCard'
+import { ErrorBox } from '../components/BugNote'
 import { InstallHint } from '../components/InstallHint'
 import { Empty, Spinner } from '../components/Spinner'
 import { useMe } from '../lib/auth'
@@ -42,7 +43,7 @@ export function Feed() {
         </div>
       </div>
 
-      {error && <p className="mb-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && <ErrorBox className="mb-4">{error}</ErrorBox>}
 
       {loading ? (
         <Spinner />
