@@ -64,24 +64,14 @@ const WEED: string[] = [
   'Iets wat je beter niet kunt doen als je high bent', 'Iets wat je kwijt bent als je stoned bent', 'Een kleur van een aansteker',
 ]
 
+// Broad on purpose: "Iets of iemand uit X" works for almost every letter.
 const NERD: string[] = [
-  // Lord of the Rings
-  'Een personage uit Lord of the Rings of The Hobbit', 'Een plek in Midden-aarde', 'Iets wat een hobbit eet', 'Een wezen uit Midden-aarde',
-  'Iets wat je meeneemt op een reis naar Mordor',
-  // Harry Potter
-  'Een personage uit Harry Potter', 'Een spreuk uit Harry Potter', 'Een magisch wezen uit Harry Potter', 'Iets wat je op de Wegisweg koopt',
-  'Iets op Zweinstein', 'Een snoepje uit de Zweinsteinexpres',
-  // Game of Thrones
-  'Een personage uit Game of Thrones', 'Een huis uit Game of Thrones', 'Een plek in Westeros of Essos', 'Een manier om dood te gaan in Game of Thrones',
-  // Star Wars
-  'Een personage uit Star Wars', 'Een planeet uit Star Wars', 'Een ruimteschip (uit elke film of serie)', 'Iets wat een Jedi bij zich heeft',
-  // Dune
-  'Iets of iemand uit Dune', 'Iets wat je meeneemt naar de woestijn',
-  // broader nerd stuff
-  'Een fantasy- of sciencefictionfilm', 'Een tovenaar of heks (uit elk verhaal)', 'Een draak (uit elk verhaal)', 'Een superkracht',
-  'Een Marvel- of DC-personage', 'Een Pokémon', 'Een gamepersonage', 'Een Nintendo-game', 'Een element uit het periodiek systeem',
-  'Een dinosaurus', 'Een Griekse of Noorse god', 'Een mob of blok uit Minecraft', 'Een anime', 'Een boek dat verfilmd is',
-  'Een mythisch wezen', 'Een alien uit een film of serie', 'Een programmeertaal',
+  'Iets of iemand uit Lord of the Rings of The Hobbit', 'Iets of iemand uit Harry Potter', 'Iets of iemand uit Game of Thrones',
+  'Iets of iemand uit Star Wars', 'Iets of iemand uit Dune', 'Iets of iemand uit Marvel of DC', 'Iets of iemand uit Pokémon',
+  'Iets of iemand uit een Disney- of Pixarfilm', 'Iets of iemand uit een videogame', 'Iets of iemand uit Minecraft',
+  'Iets of iemand uit The Simpsons of Family Guy', 'Iets of iemand uit een tekenfilm van vroeger',
+  'Een serie met meer dan 5 seizoenen', 'Een serie op Netflix', 'Een film met een vervolg', 'Een fantasy- of sciencefictionfilm',
+  'Een boek dat verfilmd is', 'Een anime', 'Een superkracht', 'Een mythisch wezen', 'Een dinosaurus', 'Een Nintendo-game',
 ]
 
 export const BUILT_IN: string[] = [...LARS, ...GENERAL, ...WEED, ...NERD]

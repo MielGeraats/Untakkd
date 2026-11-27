@@ -159,8 +159,10 @@ function Lobby({ onStart }: { onStart: (g: Game) => void }) {
           <div className="mt-3 space-y-1.5 rounded-2xl bg-leaf-50 p-4 text-left text-sm text-leaf-900/80">
             <p>🔤 De eerste speler krijgt een <b>beginletter</b>. Daarna begint elk antwoord met de <b>laatste letter</b> van het vorige antwoord.</p>
             <p>🗂️ Je antwoord moet passen bij de <b>categorie</b> en binnen de tijd. Elk woord mag maar één keer per spel.</p>
-            <p>✅ Goed = 1 pof · 🔁 <b>Bouncer</b> (begint en eindigt met dezelfde letter) = 2 poffen · 🪞 <b>Palindroom</b> (pop, raar) = 3 poffen.</p>
-            <p>❌ Fout of te laat = <b>Jilla</b>: je neemt een pof en slaat je volgende beurt over.</p>
+            <p>💨 Aan de beurt? <b>Neem een pof en houd ’m in</b> tot je een antwoord weet. Dat is je pof voor deze beurt.</p>
+            <p>✅ Goed: uitblazen en door naar de volgende.</p>
+            <p>🔁 <b>Bouncer</b> (begint en eindigt met dezelfde letter): neem er <b>1 extra pof</b> bij. 🪞 <b>Palindroom</b> (pop, raar): <b>2 extra poffen</b>.</p>
+            <p>❌ Fout of te laat = <b>Jilla</b>: géén extra pof, maar je slaat je volgende beurt over.</p>
             <p>⚡ Soms komt er een <b>bonuskaart</b>. De groep beslist of een antwoord goed is.</p>
           </div>
         )}
@@ -320,6 +322,7 @@ function Play({ game, setGame }: { game: Game; setGame: (g: Game | null) => void
           {seat.profile ? <Avatar profile={seat.profile} size="lg" /> : <span className="flex size-20 items-center justify-center rounded-full bg-leaf-100 text-3xl">✍️</span>}
           <p className="mt-2 text-sm font-bold text-leaf-800/50">{g.phase === 'jilla' ? 'Helaas pindakaas' : 'Aan de beurt'}</p>
           <h1 className="text-2xl font-black">{seat.name}</h1>
+          {g.phase !== 'jilla' && <p className="mt-1 text-sm font-bold text-leaf-700">💨 Pof erin en vasthouden!</p>}
         </div>
 
         {g.phase === 'letter' && (
@@ -335,7 +338,7 @@ function Play({ game, setGame }: { game: Game; setGame: (g: Game | null) => void
         {g.phase === 'jilla' && (
           <div className="mt-4">
             <p className="text-6xl font-black tracking-tight text-red-600">JILLA!</p>
-            <p className="mt-1 text-sm text-red-700/80">Neem een pof en sla je volgende beurt over 👮</p>
+            <p className="mt-1 text-sm text-red-700/80">Geen extra pof voor jou. Je slaat je volgende beurt over 👮</p>
             <div className="mt-4 flex gap-2">
               <button type="button" onClick={wasOnTime} className="btn btn-soft flex-1">😇 Was toch op tijd</button>
               <button type="button" onClick={() => apply(advance(g))} className="btn btn-primary flex-1">Volgende ▶</button>
@@ -355,9 +358,9 @@ function Play({ game, setGame }: { game: Game; setGame: (g: Game | null) => void
             )}
             <Timer key={g.turnId} seconds={seconds} onTimeout={jilla} />
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => score('goed')} className="btn btn-primary col-span-2 py-4 text-lg">✅ Goed <span className="opacity-70">+1</span></button>
-              <button type="button" onClick={() => score('bouncer')} className="btn btn-soft py-3">🔁 Bouncer <span className="opacity-60">+2</span></button>
-              <button type="button" onClick={() => score('palindroom')} className="btn btn-soft py-3">🪞 Palindroom <span className="opacity-60">+3</span></button>
+              <button type="button" onClick={() => score('goed')} className="btn btn-primary col-span-2 py-4 text-lg">✅ Goed</button>
+              <button type="button" onClick={() => score('bouncer')} className="btn btn-soft py-3">🔁 Bouncer <span className="opacity-60">+1 extra</span></button>
+              <button type="button" onClick={() => score('palindroom')} className="btn btn-soft py-3">🪞 Palindroom <span className="opacity-60">+2 extra</span></button>
               <button type="button" onClick={jilla} className="btn btn-danger col-span-2 py-3">❌ Fout → Jilla</button>
             </div>
           </div>

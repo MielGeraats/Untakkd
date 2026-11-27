@@ -473,3 +473,29 @@ grant select, insert, delete on public.baapring_games, public.baapring_results, 
 grant usage, select on all sequences in schema public to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- "The One Ringbaap to Rule Them All": handed out automatically to everyone in the rotation of the
+-- very first Ringbaap check-in (posters + people tagged in it). Runs after every new check-in or tag.
+create or replace function public.award_first_ringbaap()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  with first_ring as (
+    select coalesce(session_of, id) as s from checkins where method = 'ringbaap' order by created_at limit 1
+  ), session_checkins as (
+    select c.id, c.user_id from checkins c, first_ring f where c.id = f.s or c.session_of = f.s
+  ), people as (
+    select user_id from session_checkins
+    union
+    select cp.user_id from checkin_people cp join session_checkins sc on sc.id = cp.checkin_id where cp.user_id is not null
+  )
+  update profiles set special_badges = array_append(special_badges, 'ringbaap1')
+  where id in (select user_id from people) and not ('ringbaap1' = any(special_badges));
+  return null;
+end;
+$$;
+drop trigger if exists award_first_ringbaap_checkins on public.checkins;
+create trigger award_first_ringbaap_checkins after insert or update on public.checkins
+  for each statement execute function public.award_first_ringbaap();
+drop trigger if exists award_first_ringbaap_people on public.checkin_people;
+create trigger award_first_ringbaap_people after insert on public.checkin_people
+  for each statement execute function public.award_first_ringbaap();

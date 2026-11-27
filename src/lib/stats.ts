@@ -136,7 +136,7 @@ const DEFS: Def[] = [
     desc: '{n} sativa check-ins', levels: [5, 10, 25, 50, 100], metric: (s) => s.typeCount('sativa') },
   { id: 'hybrid', emoji: '🧬', titles: ['Beste van Twee Werelden', 'Diplomaat', 'Zwitserland'],
     desc: '{n} hybrid check-ins', levels: [5, 10, 25, 50, 100], metric: (s) => s.typeCount('hybrid') },
-  { id: 'voorie', emoji: '🎁', titles: ['Lui maar Slim', 'Waarom Zelf Draaien?', 'Twee Linkerhanden'],
+  { id: 'voorie', emoji: '🎁', titles: ['Wouter Niet-Draaijer', 'Waarom Zelf Draaien?', 'Twee Linkerhanden'],
     desc: '{n} voories', levels: [5, 10, 25, 50], metric: (s) => s.methodCount('voorie') },
   { id: 'edible', emoji: '🍪', titles: ['Koekiemonster', 'Bakker', 'Space Chef', 'Waar is mijn lichaam?'],
     desc: '{n} spacecakes', levels: [3, 10, 25, 50], metric: (s) => s.methodCount('edible') },
@@ -169,7 +169,7 @@ const DEFS: Def[] = [
     desc: '{n} poffen in De Baapring', levels: [25, 100, 250, 500], metric: (s) => s.game.poffen },
   { id: 'ring-jilla', emoji: '👮', titles: ['Jilla-magneet', 'Vaste Klant bij de Jilla', 'Jilla-veteraan', 'Woont in de Jilla'],
     desc: '{n} keer Jilla. Trots op?', levels: [5, 25, 50, 100], metric: (s) => s.game.jillas },
-  { id: 'monday', emoji: '😩', titles: ['Maandagochtendblues', 'Haat Maandagen', 'Garfield'],
+  { id: 'monday', emoji: '😩', titles: ['Breek de Week', 'Haat Maandagen', 'Garfield'],
     desc: '{n}× op maandagochtend ingecheckt', levels: [1, 5, 10], metric: (s) => s.mondayMornings },
 ]
 
@@ -191,6 +191,7 @@ export function computeBadges(stats: UserStats): Badge[] {
 // Hand-out badges, stored on the profile (profiles.special_badges). Only the database admin can give them.
 const SPECIAL: Record<string, Pick<Badge, 'emoji' | 'name' | 'desc'>> = {
   maker: { emoji: '👑', name: 'De Grote Baas', desc: 'Heeft deze app gebouwd in plaats van te studeren. Bugs? Zijn features.' },
+  ringbaap1: { emoji: '💍', name: 'The One Ringbaap to Rule Them All', desc: 'Was erbij toen de allereerste Ringbaap op Untakkd werd ingecheckt. My precious.' },
   og: { emoji: '🦖', name: 'OG Alpha-blower', desc: 'Een van de eerste 5. Was erbij toen Untakkd nog aan elkaar hing van plakband en vloeitjes.' },
 }
 
