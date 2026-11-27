@@ -29,17 +29,20 @@ export function countRolls(tags: Tag[]): number {
 }
 
 /**
- * How often someone rolled. Asks the database first (it sees every check-in); if that function
+ * How often someone rolled (or, with insideOut, rolled inside out). Asks the database first (it sees every check-in); if that function
  * is missing or fails, counts from the check-ins you can see yourself instead of showing 0.
  */
-export async function getRolledCount(uid: string): Promise<number> {
-  const { data, error } = await supabase.rpc('rolled_count', { uid })
+export async function getRolledCount(uid: string, insideOut = false): Promise<number> {
+  const fn = insideOut ? 'rolled_iso_count' : 'rolled_count'
+  const { data, error } = await supabase.rpc(fn, { uid })
   if (!error && typeof data === 'number') return data
-  if (error) console.warn('rolled_count failed, counting in the app instead:', error.message)
+  if (error) console.warn(`${fn} failed, counting in the app instead:`, error.message)
 
-  const { data: rows } = await supabase.from('checkin_people')
+  let q = supabase.from('checkin_people')
     .select('checkin:checkins!inner(user_id, strain_id, created_at)')
     .eq('user_id', uid).eq('role', 'roller')
+  if (insideOut) q = q.eq('checkin.roll_style', 'inside_out')
+  const { data: rows } = await q
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tags = ((rows ?? []) as any[]).map((r) => {
     const c = Array.isArray(r.checkin) ? r.checkin[0] : r.checkin

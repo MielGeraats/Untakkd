@@ -24,7 +24,7 @@ export type GameTotals = { games: number; poffen: number; bouncers: number; pali
 const NO_GAMES: GameTotals = { games: 0, poffen: 0, bouncers: 0, palindromen: 0, jillas: 0 }
 
 /** game: De Baapring career totals (optional; badges for the game stay at 0 without it). */
-export function computeStats(checkins: Checkin[], rolledCount: number, game: GameTotals = NO_GAMES) {
+export function computeStats(checkins: Checkin[], rolledCount: number, game: GameTotals = NO_GAMES, isoRolled = 0) {
   const ratings = checkins.map((c) => c.rating)
   const byStrain = new Map<number, { name: string; id: number; ratings: number[] }>()
   for (const c of checkins) {
@@ -53,6 +53,7 @@ export function computeStats(checkins: Checkin[], rolledCount: number, game: Gam
 
   return {
     game,
+    isoRolled,
     methodCount,
     photos: checkins.filter((c) => c.photo_path).length,
     withNotes: checkins.filter((c) => c.notes).length,
@@ -116,6 +117,8 @@ const DEFS: Def[] = [
     desc: '{n} verschillende strains', levels: [5, 10, 25, 50, 100], metric: (s) => s.uniqueStrains },
   { id: 'roller', emoji: '🌀', titles: ['Draaitalent', 'Draaimeester', 'Draaigod', 'Draaikolk', 'Menselijke Draaimachine', 'Heeft geen vingerafdrukken meer'],
     desc: '{n} keer de draaier geweest', levels: [5, 10, 25, 50, 100, 250], metric: (s) => s.rolledCount },
+  { id: 'iso', emoji: '🔄', titles: ['Binnenstebuiten-baas', 'Omgekeerde Wereld', 'Iso-ingenieur', 'Origami-meester', 'Draait zelfs z’n sokken inside out'],
+    desc: '{n} keer inside out (iso) gedraaid', levels: [1, 5, 10, 25, 50], metric: (s) => s.isoRolled },
   { id: 'social', emoji: '👯', titles: ['Puff Puff Pass', 'Gezelligheidsdier', 'Sociale Vlinder', 'Burgemeester van de Kring'],
     desc: '{n} sessies met gezelschap', levels: [5, 10, 25, 50, 100], metric: (s) => s.sessionsWithBuddies },
   { id: 'rotation', emoji: '🔄', titles: ['Zit in de Rotation', 'Rotatiekampioen', 'Draaideur', 'Kringkoning'],

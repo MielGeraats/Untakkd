@@ -17,7 +17,7 @@ import { getRolledCount } from '../lib/rolls'
 import { computeBadges, computeStats } from '../lib/stats'
 import { photoUrl, supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/time'
-import type { Checkin, CheckinPerson, Method, Profile, Strain } from '../lib/types'
+import type { Checkin, CheckinPerson, Method, Profile, RollStyle, Strain } from '../lib/types'
 
 /** Your own places first (most recent first), then your friends' places (most used first). */
 function placeOptions(rows: { user_id: string; place: string | null }[], me: string): PlaceOption[] {
@@ -55,6 +55,7 @@ export function NewCheckin() {
   const [boughtAt, setBoughtAt] = useState('')
   const [smokedAt, setSmokedAt] = useState('')
   const [roller, setRoller] = useState<PersonPick[]>([])
+  const [rollStyle, setRollStyle] = useState<RollStyle>('normaal')
   const [buddies, setBuddies] = useState<PersonPick[]>([])
   const [notes, setNotes] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
@@ -94,6 +95,7 @@ export function NewCheckin() {
       setSmokedAt(c.smoked_at ?? '')
       setNotes(c.notes ?? '')
       setRoller(c.people.filter((p) => p.role === 'roller').map(toPick))
+      setRollStyle(c.roll_style ?? 'normaal')
       setBuddies(c.people.filter((p) => p.role === 'buddy').map(toPick))
       setKeptPhoto(c.photo_path)
       setOriginal({ people: c.people, photo: c.photo_path })
@@ -130,6 +132,7 @@ export function NewCheckin() {
     setSmokedAt(c.smoked_at ?? '')
     setBoughtAt(c.bought_at ?? '')
     setRoller(picks(c.people.filter((p) => p.role === 'roller').map((p) => asPick(p.user_id, p.profile, p.name))))
+    setRollStyle(c.roll_style ?? 'normaal')
     setBuddies(picks([
       asPick(c.user_id, c.profile, null),
       ...c.people.filter((p) => p.role === 'buddy' && p.user_id !== me.id).map((p) => asPick(p.user_id, p.profile, p.name)),
@@ -171,6 +174,7 @@ export function NewCheckin() {
           strain_id: strain.id, method, rating,
           bought_at: boughtAt.trim() || null, smoked_at: smokedAt.trim() || null,
           notes: notes.trim() || null, photo_path,
+          roll_style: rolls && roller.length ? rollStyle : null,
         }).eq('id', editId)
         if (error) throw error
 
@@ -193,12 +197,13 @@ export function NewCheckin() {
         return navigate(`/checkin/${editId}`, { replace: true })
       }
 
-      const rolledBefore = await getRolledCount(me.id)
+      const [rolledBefore, isoBefore] = await Promise.all([getRolledCount(me.id), getRolledCount(me.id, true)])
 
       const { data: created, error } = await supabase.from('checkins').insert({
         strain_id: strain.id, method, rating,
         bought_at: boughtAt.trim() || null, smoked_at: smokedAt.trim() || null,
         notes: notes.trim() || null, photo_path,
+        roll_style: rolls && roller.length ? rollStyle : null,
         session_of: join ? sessionKey(join) : null,
       }).select('id').single()
       if (error) throw error
@@ -212,13 +217,14 @@ export function NewCheckin() {
       }
 
       // Work out which badges this check-in unlocked.
-      const [{ data: mine }, rolledAfter] = await Promise.all([
+      const [{ data: mine }, rolledAfter, isoAfter] = await Promise.all([
         supabase.from('checkins').select(CHECKIN_SELECT).eq('user_id', me.id),
         getRolledCount(me.id),
+        getRolledCount(me.id, true),
       ])
       const all = (mine ?? []).map(normalizeCheckin)
-      const before = computeBadges(computeStats(all.filter((c) => c.id !== created.id), rolledBefore))
-      const after = computeBadges(computeStats(all, rolledAfter))
+      const before = computeBadges(computeStats(all.filter((c) => c.id !== created.id), rolledBefore, undefined, isoBefore))
+      const after = computeBadges(computeStats(all, rolledAfter, undefined, isoAfter))
       // New badges and level-ups.
       const unlocked = after.filter((b) => b.level > (before.find((x) => x.id === b.id)?.level ?? 0))
 
@@ -304,6 +310,23 @@ export function NewCheckin() {
           <label className="label">🌀 Wie heeft gedraaid?</label>
           <PeoplePicker friends={friends} me={me} value={roller} onChange={setRoller} max={1}
             placeholder="Ik, een maat, of typ een naam" />
+          {roller.length > 0 && (
+            <div className="mt-3 rounded-2xl bg-leaf-50 p-3">
+              <p className="mb-2 text-sm font-extrabold text-leaf-800">Hoe is ’ie gedraaid?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ['normaal', '🌀 Normaal', 'Gewoon, zoals altijd'],
+                  ['inside_out', '🔄 Inside out', 'Iso: vloei binnenstebuiten'],
+                ] as const).map(([k, title, sub]) => (
+                  <button key={k} type="button" onClick={() => setRollStyle(k)} aria-pressed={rollStyle === k}
+                    className={`rounded-2xl border-2 px-3 py-2 text-left transition ${rollStyle === k ? 'border-leaf-600 bg-white' : 'border-transparent bg-white/60'}`}>
+                    <span className="block font-black">{title}</span>
+                    <span className="block text-xs text-leaf-800/60">{sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 

@@ -29,6 +29,7 @@ export function ProfilePage() {
   const [checkins, setCheckins] = useState<Checkin[] | null>(null) // full check-ins, friends only
   const [statsData, setStatsData] = useState<Checkin[] | null>(null) // public, just what the stats need
   const [rolled, setRolled] = useState(0)
+  const [isoRolled, setIsoRolled] = useState(0)
   const [career, setCareer] = useState<Career | null>(null)
   const [tab, setTab] = useState<Tab>('activity')
 
@@ -56,12 +57,14 @@ export function ProfilePage() {
     Promise.all([
       supabase.rpc('profile_stats_data', { uid: user.id }),
       getRolledCount(user.id),
+      getRolledCount(user.id, true),
       canSeeBaapring(me) ? fetchCareers([user.id]).catch(() => new Map<string, Career>()) : Promise.resolve(new Map<string, Career>()), // De Baapring
-    ]).then(([a, b, c]) => {
+    ]).then(([a, b, iso, c]) => {
       if (stale) return
       if (a.error) setStatsError(a.error.message)
       setStatsData(((a.data ?? []) as unknown[]).map(normalizeCheckin))
       setRolled(b)
+      setIsoRolled(iso)
       setCareer(c.get(user.id) ?? null)
     })
     return () => { stale = true }
@@ -85,7 +88,7 @@ export function ProfilePage() {
   // When you can see the full check-ins (your own profile or a friend's), count from those, so the
   // stats always match the Activiteit tab. Everyone else gets the public stats.
   const source = canSee && checkins ? checkins : statsData
-  const stats = useMemo(() => (source ? computeStats(source, rolled, career ?? undefined) : null), [source, rolled, career])
+  const stats = useMemo(() => (source ? computeStats(source, rolled, career ?? undefined, isoRolled) : null), [source, rolled, career, isoRolled])
   const special = useMemo(() => specialBadges(user?.special_badges), [user])
   const badges = useMemo(() => {
     const list = (stats ? computeBadges(stats) : []).filter((b) => canSeeBaapring(me) || !b.id.startsWith('ring-'))

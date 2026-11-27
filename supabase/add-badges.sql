@@ -7,9 +7,11 @@ revoke update on public.profiles from authenticated;
 grant update (username, display_name, bio, avatar_url) on public.profiles to authenticated;
 
 -- The first 5: OG badge for everyone, and the maker badge for the maker.
-update public.profiles set special_badges = array['og']
-  where username in ('baapturner1989', 'blownouts', 'victorrastabos', 'larry');
-update public.profiles set special_badges = array['maker', 'og'] where username = 'mielgerbaaps';
+-- (adds to the existing badges instead of overwriting them, so re-running never takes a badge away)
+update public.profiles set special_badges = array(select distinct unnest(special_badges || array['og']))
+  where username in ('baapturner1989', 'blownouts', 'victorrastabos', 'larry', 'mielgerbaaps');
+update public.profiles set special_badges = array(select distinct unnest(special_badges || array['maker']))
+  where username = 'mielgerbaaps';
 
 create or replace function public.profile_stats_data(uid uuid)
 returns json language sql stable security definer set search_path = public as $$

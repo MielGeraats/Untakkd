@@ -67,7 +67,14 @@ export function CheckinCard({ c, commentCount, linkToDetail = true }: { c: Check
   )
   if (c.smoked_at) details.push(['📍', 'Gerookt bij', placeLink('spot', c.smoked_at)])
   if (c.bought_at) details.push(['🛒', 'Gescoord bij', placeLink('shop', c.bought_at)])
-  if (rollers.length) details.push(['🌀', 'Gedraaid door', <PeopleList people={rollers} />])
+  if (rollers.length) {
+    details.push(['🌀', 'Gedraaid door', <>
+      <PeopleList people={rollers} />
+      {c.roll_style === 'inside_out' && (
+        <span className="ml-1.5 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-800">🔄 inside out</span>
+      )}
+    </>])
+  }
   if (buddies.length) details.push(['👥', 'Met', <PeopleList people={buddies} />])
   if (c.session_mates?.length) {
     details.push(['🤝', 'Samen met', c.session_mates.map((p, i) => (

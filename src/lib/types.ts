@@ -18,6 +18,8 @@ export type Strain = {
   created_at: string
 }
 
+export type RollStyle = 'normaal' | 'inside_out'
+
 export type Method = 'joint' | 'voorie' | 'ringbaap' | 'blunt' | 'spliff' | 'bong' | 'pipe' | 'vape' | 'edible' | 'gummy' | 'other'
 
 export type CheckinPerson = {
@@ -39,6 +41,8 @@ export type Checkin = {
   notes: string | null
   photo_path: string | null
   session_of: number | null
+  /** how it was rolled: normal or inside out (only when someone rolled it) */
+  roll_style?: RollStyle | null
   created_at: string
   profile: Profile
   strain: Strain

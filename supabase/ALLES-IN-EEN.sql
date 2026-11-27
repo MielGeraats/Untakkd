@@ -143,9 +143,11 @@ revoke update on public.profiles from authenticated;
 grant update (username, display_name, bio, avatar_url) on public.profiles to authenticated;
 
 -- The first 5: OG badge for everyone, and the maker badge for the maker.
-update public.profiles set special_badges = array['og']
-  where username in ('baapturner1989', 'blownouts', 'victorrastabos', 'larry');
-update public.profiles set special_badges = array['maker', 'og'] where username = 'mielgerbaaps';
+-- (adds to the existing badges instead of overwriting them, so re-running never takes a badge away)
+update public.profiles set special_badges = array(select distinct unnest(special_badges || array['og']))
+  where username in ('baapturner1989', 'blownouts', 'victorrastabos', 'larry', 'mielgerbaaps');
+update public.profiles set special_badges = array(select distinct unnest(special_badges || array['maker']))
+  where username = 'mielgerbaaps';
 
 create or replace function public.profile_stats_data(uid uuid)
 returns json language sql stable security definer set search_path = public as $$
@@ -258,8 +260,8 @@ drop policy if exists "baapring categories add"     on public.baapring_categorie
 drop policy if exists "baapring categories delete"  on public.baapring_categories;
 -- Admin = the profile with the 'maker' badge (only settable from the SQL Editor, not from the app).
 alter table public.profiles add column if not exists special_badges text[] not null default '{}';
-update public.profiles set special_badges = array['maker', 'og']
-  where username = 'mielgerbaaps' and not ('maker' = any(special_badges));
+update public.profiles set special_badges = array(select distinct unnest(special_badges || array['maker', 'og']))
+  where username = 'mielgerbaaps';
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from profiles where id = auth.uid() and 'maker' = any(special_badges));
@@ -307,8 +309,43 @@ drop trigger if exists award_first_ringbaap_people on public.checkin_people;
 create trigger award_first_ringbaap_people after insert on public.checkin_people
   for each statement execute function public.award_first_ringbaap();
 
+-- ===================== add-roll-style.sql =====================
+-- How it was rolled: normal or inside out ("iso"). Only filled when someone rolled it.
+alter table public.checkins add column if not exists roll_style text check (roll_style in ('normaal', 'inside_out'));
+
+-- Like rolled_count, but only inside-out joints (same rule: a joint checked in by several people counts once).
+create or replace function public.rolled_iso_count(uid uuid)
+returns integer language sql stable security definer set search_path = public as $$
+  with tags as (
+    select c.user_id as poster, c.strain_id, c.created_at
+    from checkin_people cp
+    join checkins c on c.id = cp.checkin_id
+    where cp.user_id = uid and cp.role = 'roller' and c.roll_style = 'inside_out'
+  ),
+  marked as (
+    select *, case when created_at - lag(created_at) over (partition by strain_id order by created_at)
+                        <= interval '3 hours' then 0 else 1 end as new_session
+    from tags
+  ),
+  sessions as (
+    select *, sum(new_session) over (partition by strain_id order by created_at rows unbounded preceding) as session
+    from marked
+  ),
+  per_poster as (
+    select strain_id, session, poster, count(*) as n from sessions group by strain_id, session, poster
+  ),
+  per_session as (
+    select strain_id, session, max(n) as n from per_poster group by strain_id, session
+  )
+  select coalesce(sum(n), 0)::integer from per_session;
+$$;
+revoke execute on function public.rolled_iso_count(uuid) from public, anon;
+grant  execute on function public.rolled_iso_count(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
 -- ===================== check =====================
--- You should see 8 rows with "ok".
+-- You should see 9 rows with "ok".
 select 'friends_of' as wat, case when exists (select 1 from pg_proc where proname = 'friends_of') then 'ok' else 'MIST' end as status
 union all select 'rolled_count', case when exists (select 1 from pg_proc where proname = 'rolled_count') then 'ok' else 'MIST' end
 union all select 'profile_stats_data', case when exists (select 1 from pg_proc where proname = 'profile_stats_data') then 'ok' else 'MIST' end
@@ -316,4 +353,5 @@ union all select 'can_join_session', case when exists (select 1 from pg_proc whe
 union all select 'special_badges', case when exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'special_badges') then 'ok' else 'MIST' end
 union all select 'notifications', case when exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'notifications_seen_at') then 'ok' else 'MIST' end
 union all select 'ringbaap badge', case when exists (select 1 from pg_proc where proname = 'award_first_ringbaap') then 'ok' else 'MIST' end
+union all select 'inside out', case when exists (select 1 from pg_proc where proname = 'rolled_iso_count') then 'ok' else 'MIST' end
 union all select 'baapring', case when exists (select 1 from information_schema.tables where table_name = 'baapring_categories') then 'ok' else 'MIST' end;

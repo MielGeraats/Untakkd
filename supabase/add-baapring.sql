@@ -59,8 +59,8 @@ drop policy if exists "baapring categories add"     on public.baapring_categorie
 drop policy if exists "baapring categories delete"  on public.baapring_categories;
 -- Admin = the profile with the 'maker' badge (only settable from the SQL Editor, not from the app).
 alter table public.profiles add column if not exists special_badges text[] not null default '{}';
-update public.profiles set special_badges = array['maker', 'og']
-  where username = 'mielgerbaaps' and not ('maker' = any(special_badges));
+update public.profiles set special_badges = array(select distinct unnest(special_badges || array['maker', 'og']))
+  where username = 'mielgerbaaps';
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from profiles where id = auth.uid() and 'maker' = any(special_badges));
