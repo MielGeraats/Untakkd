@@ -13,6 +13,7 @@ import { METHODS } from '../lib/constants'
 import { splitFriendships, useFriendships } from '../lib/friends'
 import { resizeImage } from '../lib/image'
 import { CHECKIN_SELECT, normalizeCheckin, personKey, sessionKey } from '../lib/queries'
+import { myBadges, recordBadges } from '../lib/badgeEvents'
 import { getRolledCount } from '../lib/rolls'
 import { computeBadges, computeStats } from '../lib/stats'
 import { photoUrl, supabase } from '../lib/supabase'
@@ -227,6 +228,9 @@ export function NewCheckin() {
       const after = computeBadges(computeStats(all, rolledAfter, undefined, isoAfter))
       // New badges and level-ups.
       const unlocked = after.filter((b) => b.level > (before.find((x) => x.id === b.id)?.level ?? 0))
+
+      // save them for Meldingen (in the background; the celebration screen doesn't wait for this)
+      myBadges(me).then((b) => recordBadges(b, new Set(unlocked.map((u) => u.id)))).catch(() => {})
 
       navigate(`/checkin/${created.id}`, { replace: true, state: { unlocked } })
     } catch (err) {

@@ -2,7 +2,7 @@ import { CHECKIN_SELECT, normalizeCheckin, sessionKey, withSessions } from './qu
 import { supabase } from './supabase'
 import type { Checkin, Profile } from './types'
 
-export type NotificationKind = 'tag' | 'like' | 'comment' | 'join' | 'request' | 'friends' | 'accepted'
+export type NotificationKind = 'tag' | 'like' | 'comment' | 'join' | 'request' | 'friends' | 'accepted' | 'badge'
 
 export type Notification = {
   key: string
@@ -16,6 +16,7 @@ export type Notification = {
   checkin?: Checkin
   roller?: boolean
   comment?: string
+  badge?: { emoji: string; name: string; level: number }
 }
 
 const LIMIT = 40
@@ -23,7 +24,7 @@ const LIMIT = 40
 type Row = any
 
 /** Everything that happened to you: tags, 🔥, comments, rotation joins and friend stuff. Newest first. */
-export async function fetchNotifications(me: string): Promise<Notification[]> {
+export async function fetchNotifications(me: string, meProfile: Profile): Promise<Notification[]> {
   const { data: mine } = await supabase.from('checkins').select('id, session_of, strain:strains(name)')
     .eq('user_id', me).order('created_at', { ascending: false }).limit(200)
   const myCheckins = (mine ?? []) as Row[]
@@ -80,13 +81,19 @@ export async function fetchNotifications(me: string): Promise<Notification[]> {
     if (f.status === 'pending' && !incoming) continue // your own outgoing request isn't news
     out.push({ key: `friend-${f.id}`, kind, at: f.created_at, actor })
   }
+  // Badges you earned (only your own; the starting point for old badges is saved 'silent')
+  const { data: badges } = await supabase.from('badge_events').select('id, level, name, emoji, created_at')
+    .eq('silent', false).order('created_at', { ascending: false }).limit(LIMIT)
+  for (const b of (badges ?? []) as Row[]) {
+    out.push({ key: `badge-${b.id}`, kind: 'badge', at: b.created_at, actor: meProfile, badge: { emoji: b.emoji, name: b.name, level: b.level } })
+  }
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 80)
 }
 
 /** How many notifications arrived since `since` (for the red counter on the bell). */
 export async function countNew(me: string, since: string): Promise<number> {
   const head = { count: 'exact' as const, head: true }
-  const [tags, likes, comments, requests, mine] = await Promise.all([
+  const [tags, likes, comments, requests, mine, badges] = await Promise.all([
     supabase.from('checkin_people').select('id, checkin:checkins!inner(user_id)', head)
       .eq('user_id', me).neq('checkin.user_id', me).gt('created_at', since),
     supabase.from('likes').select('user_id, checkin:checkins!inner(user_id)', head)
@@ -95,10 +102,11 @@ export async function countNew(me: string, since: string): Promise<number> {
       .eq('checkin.user_id', me).neq('user_id', me).gt('created_at', since),
     supabase.from('friendships').select('id', head).eq('addressee_id', me).gt('created_at', since),
     supabase.from('checkins').select('id, session_of').eq('user_id', me).order('created_at', { ascending: false }).limit(50),
+    supabase.from('badge_events').select('id', head).eq('silent', false).gt('created_at', since),
   ])
   const keys = [...new Set(((mine.data ?? []) as Row[]).map(sessionKey))]
   const joins = keys.length
     ? (await supabase.from('checkins').select('id', head).in('session_of', keys).neq('user_id', me).gt('created_at', since)).count ?? 0
     : 0
-  return (tags.count ?? 0) + (likes.count ?? 0) + (comments.count ?? 0) + (requests.count ?? 0) + joins
+  return (tags.count ?? 0) + (likes.count ?? 0) + (comments.count ?? 0) + (requests.count ?? 0) + (badges.count ?? 0) + joins
 }

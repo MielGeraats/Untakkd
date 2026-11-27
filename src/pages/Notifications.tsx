@@ -4,6 +4,7 @@ import { Avatar } from '../components/Avatar'
 import { BugNote } from '../components/BugNote'
 import { Empty, Spinner } from '../components/Spinner'
 import { useAuth, useMe } from '../lib/auth'
+import { myBadges, recordBadges } from '../lib/badgeEvents'
 import { fetchNotifications, type Notification } from '../lib/notifications'
 import { supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/time'
@@ -12,7 +13,7 @@ import { timeAgo } from '../lib/time'
 const JOIN_WINDOW = 12 * 3600_000
 
 const ICON: Record<Notification['kind'], string> = {
-  tag: '🏷️', like: '🔥', comment: '💬', join: '🔄', request: '👋', friends: '🤝', accepted: '🤝',
+  badge: '🏅', tag: '🏷️', like: '🔥', comment: '💬', join: '🔄', request: '👋', friends: '🤝', accepted: '🤝',
 }
 
 export function Notifications() {
@@ -24,7 +25,9 @@ export function Notifications() {
 
   useEffect(() => {
     let stale = false
-    fetchNotifications(me.id)
+    // first save any badges you earned outside a check-in (De Baapring, being tagged as roller, ...)
+    myBadges(me).then((b) => recordBadges(b)).catch(() => [])
+      .then(() => fetchNotifications(me.id, me))
       .then(async (list) => {
         if (stale) return
         setItems(list)
@@ -65,6 +68,7 @@ function Row({ n, isNew, meId }: { n: Notification; isNew: boolean; meId: string
     request: <>{who} wil je maatje worden</>,
     friends: <>{who} en jij zijn nu maten</>,
     accepted: <>{who} heeft je verzoek geaccepteerd</>,
+    badge: <>🏅 Badge verdiend: <b>{n.badge?.emoji} {n.badge?.name}</b>{(n.badge?.level ?? 1) > 1 && <> · <b className="text-leaf-700">Lvl {n.badge?.level}</b></>}</>,
   }
   const href = n.checkinId ? `/checkin/${n.checkinId}` : n.kind === 'request' ? '/friends' : `/u/${n.actor.username}`
   const c = n.checkin
