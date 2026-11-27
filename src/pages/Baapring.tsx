@@ -164,6 +164,7 @@ function Lobby({ onStart }: { onStart: (g: Game) => void }) {
             <p>🔁 <b>Bouncer</b> (begint en eindigt met dezelfde letter): neem er <b>1 extra pof</b> bij. 🪞 <b>Palindroom</b> (pop, raar): <b>2 extra poffen</b>.</p>
             <p>❌ Fout of te laat = <b>Jilla</b>: géén extra pof, maar je slaat je volgende beurt over.</p>
             <p>⚡ Soms komt er een <b>bonuskaart</b>. De groep beslist of een antwoord goed is.</p>
+            <p>🌀 Wie aan het eind de <b>minste punten</b> heeft, <b>draait de volgende</b>.</p>
           </div>
         )}
       </section>
@@ -496,6 +497,32 @@ function Finish({ game, onClose, onBack }: { game: Game; onClose: () => void; on
           </p>
         )}
       </section>
+
+      {ranked.length > 1 && (() => {
+        // lowest score rolls the next one (everyone tied for last rolls together)
+        const low = Math.min(...ranked.map((s) => elo(s.score)))
+        const losers = ranked.filter((s) => elo(s.score) === low)
+        return (
+          <section className="card border-violet-300 bg-gradient-to-br from-violet-50 to-white p-5 text-center">
+            <p className="text-4xl">🌀</p>
+            <p className="mt-1 text-lg font-black leading-tight">
+              {losers.map((s) => s.name).join(' & ')} {losers.length === 1 ? 'heeft' : 'hebben'} de minste punten…
+            </p>
+            <p className="text-leaf-800/70">{losers.length === 1 ? 'Jij draait' : 'Jullie draaien'} de volgende. Hup, vloeitjes pakken!</p>
+          </section>
+        )
+      })()}
+
+      <a href="https://www.airconsole.com" target="_blank" rel="noreferrer"
+        className="card relative block overflow-hidden border-sky-200 bg-gradient-to-br from-sky-50 to-white p-5 text-center">
+        <p className="text-lg font-black">🎮 Potje AirConsole dan maar?</p>
+        <p className="text-sm text-leaf-800/60">Tik hier en race verder</p>
+        <div className="relative mt-3 h-8" aria-hidden>
+          <span className="drive absolute text-2xl">🏎️</span>
+          <span className="drive absolute text-2xl [animation-delay:-1.3s] [animation-duration:3.2s]">🚗</span>
+          <span className="drive absolute text-2xl [animation-delay:-2.4s] [animation-duration:2.6s]">🚙</span>
+        </div>
+      </a>
 
       {error && <ErrorBox>Opslaan mislukt: {error}</ErrorBox>}
       {state === 'saved' ? (
