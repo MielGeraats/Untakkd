@@ -12,7 +12,7 @@ grant usage, select on all sequences in schema public to authenticated;
 -- ===================== add-friends-of.sql =====================
 -- Someone's friends list, visible to themselves and to their friends (so you can add each other).
 create or replace function public.friends_of(uid uuid)
-returns setof public.profiles language sql stable security definer set search_path = public as $$
+returns setof public.profile  s language sql stable security definer set search_path = public as $$
   select p.*
   from friendships f
   join profiles p on p.id = case when f.requester_id = uid then f.addressee_id else f.requester_id end

@@ -5,7 +5,7 @@ import type { Profile } from './types'
  * Test phase: only the admin (the 'maker' badge) sees and plays De Baapring.
  * To open it up for everyone, set this to true.
  */
-export const BAAPRING_FOR_EVERYONE = false
+export const BAAPRING_FOR_EVERYONE = true
 export const canSeeBaapring = (me: Pick<Profile, 'special_badges'> | null | undefined) =>
   BAAPRING_FOR_EVERYONE || Boolean(me?.special_badges?.includes('maker'))
 
